@@ -1,6 +1,6 @@
 # dotfiles
 
-Personal tmux setup for an AI-agent-heavy workflow on macOS (Ghostty).
+Personal tmux + zsh setup for an AI-agent-heavy workflow on macOS (Ghostty).
 
 ## What's in it
 
@@ -27,6 +27,11 @@ persistence (Claude panes relaunch as `claude --continue`), extended keys
 (CSI u) for Shift+Enter in TUIs, undercurl, copy-on-select to the macOS
 clipboard, per-pane title borders.
 
+**zsh.** Oh My Zsh (robbyrussell), rbenv/nvm/pnpm/bun wiring guarded so absent
+tools are skipped, man pages in nvim (`MANPAGER`), a `yolo` Claude helper, and
+generic git/tmux/claude aliases. Work-specific env, functions, and aliases stay
+in an untracked `~/.zshrc.local`, sourced last.
+
 **Claude Code integration (optional).** The status bar shows the active pane's
 Claude statusline, and window tabs turn red when an agent finishes while you're
 not looking. Both are fed by Claude Code hooks (statusLine command +
@@ -42,10 +47,12 @@ git clone https://github.com/aNiBaL-Cx/dotfiles ~/projects/dotfiles
 ```
 
 Symlinks `tmux/tmux.conf` → `~/.tmux.conf` and each script into
-`~/.config/tmux/scripts/` (per-file, so local-only scripts can coexist), and
-clones TPM if missing. Then inside tmux: `prefix + I` to install plugins.
+`~/.config/tmux/scripts/` (per-file, so local-only scripts can coexist),
+`zsh/*` → `~/.zshrc`, `~/.zprofile`, `~/.zshenv`, `~/.aliases`, and clones TPM
+if missing. Then inside tmux: `prefix + I` to install plugins.
 
-Machine-local bindings go in `~/.tmux.conf.local` (sourced last, if present).
+Machine-local config goes in `~/.tmux.conf.local` and `~/.zshrc.local`
+(both sourced last, if present).
 
 ## Dependencies
 

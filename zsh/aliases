@@ -1,0 +1,59 @@
+# cop/kkr were plain aliases in older versions of this file. Drop any stale alias so
+# re-sourcing can (re)define them as functions instead of hitting a parse error.
+unalias cop kkr 2>/dev/null
+
+# Rubocop -a on Ruby files changed vs origin/master (function: evaluates the diff when run)
+cop() {
+  local -a files
+  files=("${(@f)$(git diff --name-only --diff-filter=ACMR origin/master...HEAD -- '*.rb' '*.rake')}")
+  if (( ${#files[@]} == 0 )); then
+    echo "No changed Ruby files vs origin/master"
+    return 0
+  fi
+  ./bin/rubocop -a "${files[@]}"
+}
+
+# Kill whatever is listening on a port (default 3000). Function so the PIDs are resolved when run.
+kkr() {
+  local port="${1:-3000}"
+  local -a pids
+  pids=(${(f)"$(lsof -t -i:"$port" -sTCP:LISTEN)"})
+  if (( ${#pids} == 0 )); then
+    echo "Nothing listening on :$port"
+    return 0
+  fi
+  kill -9 "${pids[@]}"
+}
+
+alias ll="ls -lah"
+alias gs="git status"
+alias gp="git pull"
+alias gd="git diff"
+alias gdc="git diff --cached"
+alias gdom="git diff origin/master"
+alias gres="git restore --source=origin/master"
+alias ..="cd .."
+
+alias be="bundle exec"
+alias rdb="bundle exec rails dbconsole"
+alias rr="npm start"
+
+# Tmux and friends
+alias mux='tmuxinator'
+alias ktmux="tmux kill-server"
+alias t='tmux'
+alias ta='tmux attach -t'
+
+# Claude
+alias cl="claude"
+alias cla="claude --file .claude/ARCHITECTURE.md"
+alias clf="claude --model fable"
+alias clo="claude --model opus"
+alias cls="claude --model sonnet"
+alias clh="claude --model haiku"
+
+alias rv='git fetch origin master --quiet && critique review origin/master --agent claude'
+alias lg='lazygit'
+
+# Latest commits, subjects only, oldest first (release-notes friendly)
+alias gl4s='git --no-pager log --oneline -10 --format="%s" --reverse'

@@ -15,6 +15,12 @@ for f in "$repo"/tmux/scripts/*; do
   echo "linked ~/.config/tmux/scripts/$(basename "$f")"
 done
 
+ln -sfn "$repo/zsh/zshrc"    "$HOME/.zshrc"
+ln -sfn "$repo/zsh/zprofile" "$HOME/.zprofile"
+ln -sfn "$repo/zsh/zshenv"   "$HOME/.zshenv"
+ln -sfn "$repo/zsh/aliases"  "$HOME/.aliases"
+echo "linked ~/.zshrc ~/.zprofile ~/.zshenv ~/.aliases"
+
 if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
   git clone --depth 1 https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
   echo "installed TPM"
