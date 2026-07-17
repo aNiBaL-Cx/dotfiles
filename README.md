@@ -1,6 +1,7 @@
 # dotfiles
 
-Personal tmux + zsh setup for an AI-agent-heavy workflow on macOS (Ghostty).
+Personal tmux + zsh + nvim setup for an AI-agent-heavy workflow on macOS
+(Ghostty).
 
 ## What's in it
 
@@ -32,6 +33,12 @@ tools are skipped, man pages in nvim (`MANPAGER`), a `yolo` Claude helper, and
 generic git/tmux/claude aliases. Work-specific env, functions, and aliases stay
 in an untracked `~/.zshrc.local`, sourced last.
 
+**nvim.** Stock [LazyVim](https://www.lazyvim.org/) plus a thin layer: PT-keyboard
+remaps (`ç`/`Ç` → `]`/`[`, `<leader>\` split), indent folding, zellij-aware
+`Ctrl+hjkl` navigation, and `Space a` on a visual selection — sends it to the
+tmux annotation buffer with a `file:line` header (the nvim entry point to the
+copy-mode `a` flow above).
+
 **Claude Code integration (optional).** The status bar shows the active pane's
 Claude statusline, and window tabs turn red when an agent finishes while you're
 not looking. Both are fed by Claude Code hooks (statusLine command +
@@ -48,8 +55,10 @@ git clone https://github.com/aNiBaL-Cx/dotfiles ~/projects/dotfiles
 
 Symlinks `tmux/tmux.conf` → `~/.tmux.conf` and each script into
 `~/.config/tmux/scripts/` (per-file, so local-only scripts can coexist),
-`zsh/*` → `~/.zshrc`, `~/.zprofile`, `~/.zshenv`, `~/.aliases`, and clones TPM
-if missing. Then inside tmux: `prefix + I` to install plugins.
+`nvim/` → `~/.config/nvim` (whole dir; an existing real directory is skipped —
+move it aside first), `zsh/*` → `~/.zshrc`, `~/.zprofile`, `~/.zshenv`,
+`~/.aliases`, and clones TPM if missing. Then inside tmux: `prefix + I` to
+install plugins.
 
 Machine-local config goes in `~/.tmux.conf.local` and `~/.zshrc.local`
 (both sourced last, if present).
