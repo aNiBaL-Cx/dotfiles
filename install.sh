@@ -15,6 +15,15 @@ for f in "$repo"/tmux/scripts/*; do
   echo "linked ~/.config/tmux/scripts/$(basename "$f")"
 done
 
+# Whole-dir link; ln -sfn into an existing real directory would nest the link
+# inside it, so require it to be moved aside first.
+if [ -d "$HOME/.config/nvim" ] && [ ! -L "$HOME/.config/nvim" ]; then
+  echo "skipped ~/.config/nvim (existing directory — move it aside first)"
+else
+  ln -sfn "$repo/nvim" "$HOME/.config/nvim"
+  echo "linked ~/.config/nvim"
+fi
+
 ln -sfn "$repo/zsh/zshrc"    "$HOME/.zshrc"
 ln -sfn "$repo/zsh/zprofile" "$HOME/.zprofile"
 ln -sfn "$repo/zsh/zshenv"   "$HOME/.zshenv"
