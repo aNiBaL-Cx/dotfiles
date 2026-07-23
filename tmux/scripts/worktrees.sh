@@ -2,11 +2,12 @@
 # Worktree picker across sibling repos, grouped by worktree name (e.g. a
 # ticket slug reused across several repos).
 #
-# Pick a name -> its worktree in the CURRENT repo opens in a NEW pane
-# (or the first, if the current repo isn't in the group). A new pane, not a cd
-# of the current one, so it works even when this pane is busy (claude session,
-# dev server, ...). If the name also exists in OTHER repos, you're asked
-# whether to open those in new panes too.
+# Pick a name -> its worktree in the CURRENT repo is opened (or the first, if
+# the current repo isn't in the group). If the current pane is an idle shell it
+# is reused (cd in place); if it is busy (claude session, dev server, ...) a new
+# pane is opened instead, since a cd would just type into that program.
+# If the name also exists in OTHER repos, you're asked whether to open those in
+# new panes too.
 #
 # Root of repos: $WORKTREE_ROOT if set, else inferred as the parent directory
 # of the current repo's primary checkout (a "folder of repos" layout).
@@ -98,10 +99,21 @@ if [ -n "$cur_repo" ]; then
 fi
 [ -n "$primary" ] || primary="${paths[0]}"
 
-# Open the primary in a NEW pane (the current pane may be busy with a claude
-# session, a dev server, etc., where a cd would just type into the program).
+# If the current pane is an idle shell, reuse it (cd in place). If it is busy
+# (a claude session, dev server, etc.) a cd would just type into that program,
+# so open the primary in a NEW pane instead.
 win="$(tmux display-message -p -t "$src_pane" '#{window_id}')"
-primary_pane="$(tmux split-window -t "$src_pane" -c "$primary" -P -F '#{pane_id}')"
+src_cmd="$(tmux display-message -p -t "$src_pane" '#{pane_current_command}')"
+case "$src_cmd" in
+  *sh)
+    tmux send-keys -t "$src_pane" -l "cd $(printf '%q' "$primary")"
+    tmux send-keys -t "$src_pane" Enter
+    primary_pane="$src_pane"
+    ;;
+  *)
+    primary_pane="$(tmux split-window -t "$src_pane" -c "$primary" -P -F '#{pane_id}')"
+    ;;
+esac
 
 # The rest (other repos) -> optional new panes.
 rest=()
