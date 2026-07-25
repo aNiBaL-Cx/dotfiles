@@ -1,0 +1,223 @@
+#!/usr/bin/env bash
+# Block until an agent pane goes idle (or its process exits). The scriptable
+# counterpart to tmux-agent-tui: the TUI *shows* agent state, this *waits* on
+# it — which is what fan-out needs (launch N agents, wait, collect).
+#
+# State comes from /tmp/agent-state-<pane_id>, written by the Claude hooks in
+# ~/.claude/hooks/agent-state.sh (UserPromptSubmit -> working, Stop -> idle).
+# A MISSING file means "not started yet", NOT idle — otherwise waiting on a
+# freshly launched agent returns instantly, before its first prompt lands.
+#
+# "idle" means the agent is not working: finished, OR waiting on your input /
+# a permission prompt (the Notification hook writes idle too). It does not
+# mean "succeeded" — check the work, not just the state.
+#
+# Usage: tmux-agent-wait [options] <selector>...
+#   selectors:  %5 | active | path:<dir> | branch:<ref> | <session>:<window>
+#   --for idle|exit    condition (default: idle)
+#   --any              return when the FIRST selector matches (default: all)
+#   --timeout <s>      overall timeout, 0 = forever (default: 1800)
+#   --grace <s>        how long to tolerate "not started yet" (default: 60)
+#   --settle <n>       consecutive matching polls required (default: 2)
+#   --interval <ms>    poll interval (default: 500)
+#   -q, --quiet        suppress progress output
+#
+# Exit: 0 condition met · 1 usage/resolve error · 2 timeout
+#       3 pane exited before going idle · 4 never started (no state within --grace)
+#
+# Testable headless: AGENT_STATE_DIR overrides /tmp. Without $TMUX, panes are
+# assumed live and only the state files are read, so %id selectors work but
+# active/path:/branch: (which need tmux) fail with exit 1.
+
+set -uo pipefail
+
+STATE_DIR="${AGENT_STATE_DIR:-/tmp}"
+
+G=$'\033[38;2;166;227;161m'; Y=$'\033[38;2;249;226;175m'
+R=$'\033[38;2;243;139;168m'; D=$'\033[2m'; X=$'\033[0m'
+
+cond=idle; mode=all; timeout=1800; grace=60; settle=2; interval=500; quiet=0
+sels=()
+
+die() { printf '%stmux-agent-wait: %s%s\n' "$R" "$1" "$X" >&2; exit "${2:-1}"; }
+num() { case "$2" in '' | *[!0-9]*) die "$1 expects a number, got '$2'" ;; esac; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --for)      cond="${2:-}"; shift 2 || die "--for expects a value" ;;
+    --any)      mode=any; shift ;;
+    --timeout)  num --timeout "${2:-}";  timeout="$2";  shift 2 ;;
+    --grace)    num --grace "${2:-}";    grace="$2";    shift 2 ;;
+    --settle)   num --settle "${2:-}";   settle="$2";   shift 2 ;;
+    --interval) num --interval "${2:-}"; interval="$2"; shift 2 ;;
+    -q|--quiet) quiet=1; shift ;;
+    -h|--help)  sed -n '2,29p' "$0" | sed 's/^#\{1,\} \{0,1\}//'; exit 0 ;;
+    -*)         die "unknown option: $1" ;;
+    *)          sels+=("$1"); shift ;;
+  esac
+done
+
+case "$cond" in idle|exit) ;; *) die "--for expects idle or exit, got '$cond'" ;; esac
+[ "$settle" -lt 1 ] && settle=1
+[ ${#sels[@]} -eq 0 ] && die "no selector given (try --help)"
+
+# Live agent panes as "pane|path|loc". The command test mirrors tmux-agent-tui:
+# a running Claude reports its version as the command, exited ones revert to a
+# shell. Keep the two in sync.
+agent_panes() {
+  [ -n "${TMUX:-}" ] || return 0
+  tmux list-panes -a -F '#{pane_id}|#{pane_current_path}|#{session_name}:#{window_index}|#{pane_current_command}' 2>/dev/null |
+    while IFS='|' read -r p path loc cmd; do
+      case "$cmd" in [0-9]*|claude|agent|cursor-agent) printf '%s|%s|%s\n' "$p" "$path" "$loc" ;; esac
+    done
+}
+
+# tmux reports pane_current_path fully resolved (/private/var/... on macOS, and
+# any symlinked dir resolved), so selector paths must be resolved too or they
+# never match. Falls back to the literal so a nonexistent path still errors.
+abspath() { (cd "$1" 2>/dev/null && pwd -P) || printf '%s\n' "${1%/}"; }
+
+# branch:<ref> -> the worktree path checked out at that ref, using $PWD's repo.
+branch_path() {
+  local ref="$1" porcelain cur=""
+  porcelain=$(git worktree list --porcelain 2>/dev/null) || return 1
+  while IFS= read -r line; do
+    case "$line" in
+      worktree\ *) cur="${line#worktree }" ;;
+      branch\ *)   [ "${line#branch refs/heads/}" = "$ref" ] && { printf '%s\n' "$cur"; return 0; } ;;
+    esac
+  done <<< "$porcelain"
+  return 1
+}
+
+resolve() {
+  local sel="$1" want p
+  case "$sel" in
+    %*)
+      printf '%s\n' "$sel" ;;
+    active)
+      [ -n "${TMUX:-}" ] || die "selector 'active' needs a tmux session"
+      tmux display-message -p '#{pane_id}' 2>/dev/null || die "cannot resolve active pane" ;;
+    path:*)
+      [ -n "${TMUX:-}" ] || die "selector '$sel' needs a tmux session"
+      want=$(abspath "${sel#path:}")
+      p=$(agent_panes | awk -F'|' -v w="$want" '$2==w {print $1; exit}')
+      [ -n "$p" ] || die "no agent pane at path '$want'"
+      printf '%s\n' "$p" ;;
+    branch:*)
+      [ -n "${TMUX:-}" ] || die "selector '$sel' needs a tmux session"
+      want=$(branch_path "${sel#branch:}") || die "no worktree on branch '${sel#branch:}'"
+      want=$(abspath "$want")
+      p=$(agent_panes | awk -F'|' -v w="$want" '$2==w {print $1; exit}')
+      [ -n "$p" ] || die "no agent pane in worktree '$want'"
+      printf '%s\n' "$p" ;;
+    *:*)
+      [ -n "${TMUX:-}" ] || die "selector '$sel' needs a tmux session"
+      p=$(agent_panes | awk -F'|' -v l="$sel" '$3==l {print $1; exit}')
+      [ -n "$p" ] || die "no agent pane in window '$sel'"
+      printf '%s\n' "$p" ;;
+    *)
+      die "unrecognized selector: '$sel'" ;;
+  esac
+}
+
+# resolve() runs in a command substitution, so its `die` only kills the subshell —
+# check the status here or an unresolvable selector silently becomes an empty pane.
+panes=()
+for sel in "${sels[@]}"; do
+  p=$(resolve "$sel") || exit 1
+  [ -n "$p" ] || die "could not resolve selector '$sel'"
+  panes+=("$p")
+done
+
+# One tmux call per poll, shared by every pane: "pane|cmd" for ALL panes (not
+# just agent ones) so a pane whose agent exited back to the shell is visible.
+snapshot=""
+refresh() {
+  [ -n "${TMUX:-}" ] || { snapshot=""; return; }
+  snapshot=$(tmux list-panes -a -F '#{pane_id}|#{pane_current_command}' 2>/dev/null)
+}
+
+# -> working | idle | unknown | exited | gone
+state_of() {
+  # NOTE: separate statements on purpose — `local p="$1" f="...$p"` expands the
+  # whole argument list before assigning, so $p is still unbound (set -u aborts).
+  local p="$1"
+  local f="$STATE_DIR/agent-state-$p" cmd v
+  if [ -n "${TMUX:-}" ]; then
+    cmd=$(printf '%s\n' "$snapshot" | awk -F'|' -v p="$p" '$1==p {print $2; exit}')
+    [ -z "$cmd" ] && { echo gone; return; }
+    case "$cmd" in *sh) echo exited; return ;; esac
+  fi
+  [ -f "$f" ] || { echo unknown; return; }
+  v=$(cat "$f" 2>/dev/null)
+  case "$v" in working) echo working ;; *) echo idle ;; esac
+}
+
+matches() {  # does this state satisfy --for?
+  case "$cond" in
+    idle) [ "$1" = idle ] ;;
+    exit) [ "$1" = exited ] || [ "$1" = gone ] ;;
+  esac
+}
+
+progress() {
+  [ "$quiet" -eq 1 ] && return
+  [ -t 2 ] || return
+  printf '\r\033[K%s%s%s %s' "$D" "$1" "$X" "$2" >&2
+}
+
+done_line() {
+  [ "$quiet" -eq 1 ] && return
+  [ -t 2 ] && printf '\r\033[K' >&2
+  printf '%s%s%s\n' "$1" "$2" "$X" >&2
+}
+
+hits=(); for _ in "${panes[@]}"; do hits+=(0); done
+started=0
+SECONDS=0
+
+while :; do
+  refresh
+  ok=0; states=()
+  for i in "${!panes[@]}"; do
+    st=$(state_of "${panes[$i]}")
+    states+=("$st")
+    [ "$st" != unknown ] && started=1
+
+    # A pane that exits before going idle is a failure for --for idle: the
+    # agent is never going to report anything, so don't sit out the timeout.
+    if [ "$cond" = idle ] && { [ "$st" = exited ] || [ "$st" = gone ]; }; then
+      done_line "$R" "✗ ${panes[$i]} exited before going idle"
+      exit 3
+    fi
+
+    if matches "$st"; then
+      hits[$i]=$(( hits[i] + 1 ))
+    else
+      hits[$i]=0
+    fi
+    [ "${hits[$i]}" -ge "$settle" ] && ok=$(( ok + 1 ))
+  done
+
+  if [ "$mode" = any ]; then
+    [ "$ok" -ge 1 ] && { done_line "$G" "✓ 1/${#panes[@]} $cond"; exit 0; }
+  else
+    [ "$ok" -ge "${#panes[@]}" ] && { done_line "$G" "✓ ${#panes[@]}/${#panes[@]} $cond"; exit 0; }
+  fi
+
+  # Nothing has ever reported: the agent probably never launched, or has no
+  # hooks wired. Distinct exit code so callers can tell this from a slow run.
+  if [ "$started" -eq 0 ] && [ "$grace" -gt 0 ] && [ "$SECONDS" -ge "$grace" ]; then
+    done_line "$R" "✗ no agent state within ${grace}s (hooks not wired, or never launched)"
+    exit 4
+  fi
+
+  if [ "$timeout" -gt 0 ] && [ "$SECONDS" -ge "$timeout" ]; then
+    done_line "$R" "✗ timeout after ${timeout}s ($ok/${#panes[@]} $cond)"
+    exit 2
+  fi
+
+  progress "${SECONDS}s" "$ok/${#panes[@]} $cond  ${D}[${states[*]}]${X}"
+  sleep "$(awk -v ms="$interval" 'BEGIN{printf "%.3f", ms/1000}')"
+done
