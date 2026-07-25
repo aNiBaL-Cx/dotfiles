@@ -22,6 +22,11 @@ stay free for the shell and editors.
   sibling repos (root inferred from the current repo, or `$WORKTREE_ROOT`).
 - `prefix W` — worktree manager for the current repo: open/jump, new, delete,
   rename.
+- `tmux-agent-wait` — no keybinding; the scriptable counterpart to the agent
+  TUI. Blocks until agent panes go idle (or exit) so fan-out scripts can launch
+  N agents, wait, then collect. Selectors: `%5`, `active`, `path:<dir>`,
+  `branch:<ref>`, `<session>:<window>`. Distinct exit codes for timeout, early
+  exit, and never-started; `--help` for the rest.
 
 **Quality of life:** catppuccin (mocha) + TPM, resurrect/continuum session
 persistence (Claude panes relaunch as `claude --continue`), extended keys
@@ -62,6 +67,21 @@ install plugins.
 
 Machine-local config goes in `~/.tmux.conf.local` and `~/.zshrc.local`
 (both sourced last, if present).
+
+## Tests
+
+Scripts under `tmux/scripts/` are testable headless via env-var overrides
+(`AGENT_STATE_DIR`, `AGENT_PANES_FILE`, `WT_CWD`). Suites live in `tmux/tests/`
+— deliberately not in `tmux/scripts/`, which `install.sh` symlinks wholesale.
+
+```bash
+tmux/tests/agent-wait.test.sh        # headless, no tmux server
+tmux/tests/agent-wait.tmux.test.sh   # live tmux on an isolated -L socket
+```
+
+The tmux suite needs `cc` (it compiles a stub binary named `claude`, since
+macOS reports `pane_current_command` from the kernel process name) and skips
+itself when unavailable. It never touches your real tmux server.
 
 ## Dependencies
 
