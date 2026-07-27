@@ -48,6 +48,17 @@ remaps (`ç`/`Ç` → `]`/`[`, `<leader>\` split), indent folding, zellij-aware
 tmux annotation buffer with a `file:line` header (the nvim entry point to the
 copy-mode `a` flow above).
 
+**Chrome.** `chrome-tab-groups` — bulk-delete saved tab groups (the chips on the
+bookmarks bar), which Chrome itself only lets you remove one at a time. Filter
+by title, substring or `--regex`; listing is the default and `--delete` commits.
+Listing works with Chrome open (it reads a throwaway copy, since Chrome locks
+the store); deleting needs Chrome quit, or `--restart` to have it quit and
+relaunched for you — with a confirmation first, because tabs only reopen if the
+profile is set to "Continue where you left off". The groups live in the
+profile's sync LevelDB alongside preferences, sessions and passkeys, so every
+delete backs the store up first and only ever touches `saved_tab_group` keys.
+Groups re-sync unless tab group sync is off. `--help` for the rest.
+
 **Claude Code integration (optional).** The status bar shows the active pane's
 Claude statusline; window tabs turn red when an agent finishes while you're not
 looking; and a notification (macOS banner, plus ntfy/Pushover when configured)
@@ -68,8 +79,11 @@ Symlinks `tmux/tmux.conf` → `~/.tmux.conf` and each script into
 `~/.config/tmux/scripts/` (per-file, so local-only scripts can coexist),
 `nvim/` → `~/.config/nvim` (whole dir; an existing real directory is skipped —
 move it aside first), `zsh/*` → `~/.zshrc`, `~/.zprofile`, `~/.zshenv`,
-`~/.aliases`, and clones TPM if missing. Then inside tmux: `prefix + I` to
-install plugins.
+`~/.aliases`, `chrome/chrome-tab-groups` → `~/.local/bin/`, and clones TPM if
+missing. Then inside tmux: `prefix + I` to install plugins.
+
+`chrome-tab-groups` needs one npm package; `install.sh` fetches it into
+`chrome/node_modules/` (untracked) when npm is available.
 
 Machine-local config goes in `~/.tmux.conf.local` and `~/.zshrc.local`
 (both sourced last, if present).
@@ -85,7 +99,12 @@ tmux/tests/agent-wait.test.sh         # headless, no tmux server
 tmux/tests/agent-wait.tmux.test.sh    # live tmux on an isolated -L socket
 tmux/tests/claude-resurrect.test.sh   # session resolution, stubbed CLAUDE_BIN
 tmux/tests/agent-jump.test.sh          # notification click action, stubbed tmux/open
+chrome/tests/chrome-tab-groups.test.sh # fixture LevelDB, stubbed pgrep
 ```
+
+The chrome suite builds a throwaway LevelDB shaped like Chrome's sync store and
+stubs `pgrep`, so it never reads a real profile and passes with Chrome open. It
+asserts that a delete leaves every non-`saved_tab_group` key intact.
 
 The tmux suite needs `cc` (it compiles a stub binary named `claude`, since
 macOS reports `pane_current_command` from the kernel process name) and skips
@@ -96,6 +115,8 @@ itself when unavailable. It never touches your real tmux server.
 - tmux ≥ 3.5, macOS (`pbcopy`/`pbpaste`)
 - Homebrew bash ≥ 4 (the TUIs use `read -N`)
 - `fzf`, `nvim` (annotation buffer / pickers)
+- node (any recent version) for `chrome-tab-groups` only — resolved via
+  `$CHROME_TAB_GROUPS_NODE`, `PATH`, then the newest nvm install
 
 ## Credits
 

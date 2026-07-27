@@ -1,0 +1,10 @@
+{
+  "name": "chrome-tab-groups",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LevelDB helper for the chrome-tab-groups CLI",
+  "type": "module",
+  "dependencies": {
+    "classic-level": "^3.0.0"
+  }
+}

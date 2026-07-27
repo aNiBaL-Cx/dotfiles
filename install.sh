@@ -30,6 +30,22 @@ ln -sfn "$repo/zsh/zshenv"   "$HOME/.zshenv"
 ln -sfn "$repo/zsh/aliases"  "$HOME/.aliases"
 echo "linked ~/.zshrc ~/.zprofile ~/.zshenv ~/.aliases"
 
+# Not under tmux/scripts: the loop above chmods and links everything in that
+# directory, which would drag node_modules along with it.
+mkdir -p "$HOME/.local/bin"
+chmod +x "$repo/chrome/chrome-tab-groups"
+ln -sfn "$repo/chrome/chrome-tab-groups" "$HOME/.local/bin/chrome-tab-groups"
+echo "linked ~/.local/bin/chrome-tab-groups"
+
+if [ ! -d "$repo/chrome/node_modules" ]; then
+  if command -v npm >/dev/null 2>&1; then
+    npm install --prefix "$repo/chrome" --silent --no-audit --no-fund
+    echo "installed chrome-tab-groups dependencies"
+  else
+    echo "skipped chrome-tab-groups dependencies (no npm — run: npm install --prefix $repo/chrome)"
+  fi
+fi
+
 if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
   git clone --depth 1 https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
   echo "installed TPM"
