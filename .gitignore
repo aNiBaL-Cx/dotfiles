@@ -1,3 +1,6 @@
 # Machine-local Claude permissions (absolute paths, per-machine grants).
 # The portable wiring lives in .claude/settings.json.
 .claude/settings.local.json
+
+# Installed by install.sh; the lockfile is what's tracked.
+chrome/node_modules/
