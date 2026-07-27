@@ -22,6 +22,10 @@ stay free for the shell and editors.
   sibling repos (root inferred from the current repo, or `$WORKTREE_ROOT`).
 - `prefix W` — worktree manager for the current repo: open/jump, new, delete,
   rename.
+- `claude-resurrect` — no keybinding; how resurrect brings claude panes back.
+  Resumes the session recorded **for that pane** instead of `claude --continue`,
+  which resumed the newest session for the *directory* — a coin flip with two
+  claudes in one worktree. Prints which branch it took.
 - `tmux-agent-wait` — no keybinding; the scriptable counterpart to the agent
   TUI. Blocks until agent panes go idle (or exit) so fan-out scripts can launch
   N agents, wait, then collect. Selectors: `%5`, `active`, `path:<dir>`,
@@ -29,7 +33,7 @@ stay free for the shell and editors.
   exit, and never-started; `--help` for the rest.
 
 **Quality of life:** catppuccin (mocha) + TPM, resurrect/continuum session
-persistence (Claude panes relaunch as `claude --continue`), extended keys
+persistence (Claude panes come back via `claude-resurrect`), extended keys
 (CSI u) for Shift+Enter in TUIs, undercurl, copy-on-select to the macOS
 clipboard, per-pane title borders.
 
@@ -45,11 +49,13 @@ tmux annotation buffer with a `file:line` header (the nvim entry point to the
 copy-mode `a` flow above).
 
 **Claude Code integration (optional).** The status bar shows the active pane's
-Claude statusline, and window tabs turn red when an agent finishes while you're
-not looking. Both are fed by Claude Code hooks (statusLine command +
-Stop/Notification hooks writing `/tmp/claude-statusline-<pane>` /
-window-format overrides) that live outside this repo — without them the
-segments simply stay empty.
+Claude statusline; window tabs turn red when an agent finishes while you're not
+looking; and a notification (macOS banner, plus ntfy/Pushover when configured)
+reaches you outside tmux. Fed by Claude Code hooks (statusLine command +
+Stop/Notification hooks writing `/tmp/claude-statusline-<pane>`,
+`/tmp/agent-state-<pane>`, `~/.claude/pane-sessions/`, and window-format
+overrides) that live outside this repo — without them the segments simply stay
+empty and `claude-resurrect` falls back to `--continue`.
 
 ## Install
 
@@ -75,8 +81,9 @@ Scripts under `tmux/scripts/` are testable headless via env-var overrides
 — deliberately not in `tmux/scripts/`, which `install.sh` symlinks wholesale.
 
 ```bash
-tmux/tests/agent-wait.test.sh        # headless, no tmux server
-tmux/tests/agent-wait.tmux.test.sh   # live tmux on an isolated -L socket
+tmux/tests/agent-wait.test.sh         # headless, no tmux server
+tmux/tests/agent-wait.tmux.test.sh    # live tmux on an isolated -L socket
+tmux/tests/claude-resurrect.test.sh   # session resolution, stubbed CLAUDE_BIN
 ```
 
 The tmux suite needs `cc` (it compiles a stub binary named `claude`, since
