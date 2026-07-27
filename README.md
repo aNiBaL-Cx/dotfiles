@@ -84,6 +84,7 @@ Scripts under `tmux/scripts/` are testable headless via env-var overrides
 tmux/tests/agent-wait.test.sh         # headless, no tmux server
 tmux/tests/agent-wait.tmux.test.sh    # live tmux on an isolated -L socket
 tmux/tests/claude-resurrect.test.sh   # session resolution, stubbed CLAUDE_BIN
+tmux/tests/agent-jump.test.sh          # notification click action, stubbed tmux/open
 ```
 
 The tmux suite needs `cc` (it compiles a stub binary named `claude`, since

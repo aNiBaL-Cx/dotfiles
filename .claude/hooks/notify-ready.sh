@@ -35,10 +35,12 @@ tmux set-window-option -t "$window_target" window-status-format "#[fg=#1e1e2e,bg
 claude_window_name=$(tmux display-message -t "$TMUX_PANE" -p '#W')
 meta=$(awk -F' · ' 'NR==1{print $1 (NF>1?" · "$2:"")}' \
   "/tmp/claude-statusline-${TMUX_PANE}" 2>/dev/null)
+# 4th arg is the jump target: clicking the banner lands you on this window.
 "$(dirname "$0")/notify-push.sh" \
   "agent ready · ${claude_window_name}" \
   "${claude_session}:${claude_window}${meta:+ · $meta}" \
-  "$TMUX_PANE"
+  "$TMUX_PANE" \
+  "$window_target"
 
 # Cross-session: mark status-left red in every session currently being viewed
 # that is not the agent's own.

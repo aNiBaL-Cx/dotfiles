@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Jump to an agent's tmux window and bring the terminal forward. Invoked by the
+# notification's click action (notify-push.sh passes this to terminal-notifier
+# -execute), so it runs with NO tmux client context and a bare environment —
+# hence the explicit client loop instead of a plain `switch-client`.
+#
+# Usage: tmux-agent-jump <session>:<window> [terminal-bundle-id]
+#
+# Exits 0 even when the target is gone: a stale notification click should be a
+# no-op, not an error dialog.
+
+target="${1:-}"
+# ${2-...} not ${2:-...}: an explicitly empty app means "jump only, do not
+# foreground", which the [ -n "$app" ] guard below relies on. With the colon form
+# that guard is unreachable.
+app="${2-${NOTIFY_TERMINAL_APP:-com.mitchellh.ghostty}}"
+[ -z "$target" ] && exit 0
+
+command -v tmux >/dev/null 2>&1 || exit 0
+tmux has-session -t "${target%%:*}" 2>/dev/null || exit 0
+
+# Select the window inside its session, then point every attached client at that
+# session — whichever client you are actually looking at lands on it.
+tmux select-window -t "$target" 2>/dev/null
+while IFS= read -r client; do
+  [ -n "$client" ] && tmux switch-client -c "$client" -t "${target%%:*}" 2>/dev/null
+done < <(tmux list-clients -F '#{client_name}' 2>/dev/null)
+
+# Foreground the terminal. `open -b` takes a bundle id; -a takes a name.
+if [ -n "$app" ]; then
+  case "$app" in
+    *.*) open -b "$app" 2>/dev/null || true ;;
+    *)   open -a "$app" 2>/dev/null || true ;;
+  esac
+fi
+
+exit 0
