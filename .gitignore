@@ -1,0 +1,3 @@
+# Machine-local Claude permissions (absolute paths, per-machine grants).
+# The portable wiring lives in .claude/settings.json.
+.claude/settings.local.json
