@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Restore the Claude session that belonged to THIS pane, then exec into it.
+# Referenced from @resurrect-processes in ~/.tmux.conf.
+#
+# Why not plain `claude --continue`: --continue resumes the most recent session
+# for the CWD. With two Claude panes in the same worktree that is a coin flip —
+# one pane silently adopts the other's history. ~/.tmux.conf carried a comment
+# admitting exactly this.
+#
+# Fix: agent-state.sh records session_id per pane under ~/.claude/pane-sessions/,
+# keyed by session:window.pane + cwd (coordinates resurrect restores faithfully;
+# pane_id is not, it gets reassigned). This looks that record up and resumes by
+# id. Resolution order:
+#
+#   1. exact record for these coordinates, transcript still on disk -> --resume <id>
+#   2. no record, but the cwd has exactly one transcript              -> --resume <id>
+#   3. no record, several transcripts                                 -> --continue + warning
+#   4. no transcripts at all                                          -> plain claude
+#
+# Every branch prints what it chose. The old failure was silent; a wrong resume
+# you can see is recoverable.
+#
+# Extra args are forwarded: `claude-resurrect --model opus`.
+
+CLAUDE_BIN="${CLAUDE_BIN:-claude}"
+SESSIONS_DIR="${CLAUDE_PANE_SESSIONS_DIR:-$HOME/.claude/pane-sessions}"
+PROJECTS_DIR="${CLAUDE_PROJECTS_DIR:-$HOME/.claude/projects}"
+
+D=$'\033[2m'; Y=$'\033[38;2;249;226;175m'; X=$'\033[0m'
+note() { printf '%s%s%s\n' "$D" "$1" "$X" >&2; }
+warn() { printf '%s%s%s\n' "$Y" "$1" "$X" >&2; }
+
+slug() { printf '%s' "$1" | sed 's/[/.]/-/g'; }
+
+# agent-state.sh keys the record off tmux's pane_current_path, which is fully
+# RESOLVED, so resolve here too — otherwise a symlinked worktree root makes the
+# keys diverge and the lookup silently degrades to --continue, i.e. the bug this
+# script exists to fix, back but invisible.
+cwd=$(pwd -P 2>/dev/null || printf '%s' "$PWD")
+
+key=""
+if [ -n "${TMUX:-}" ]; then
+  IFS='|' read -r sess win pidx <<< "$(tmux display-message -t "${TMUX_PANE:-}" \
+    -p '#{session_name}|#{window_index}|#{pane_index}' 2>/dev/null)"
+  [ -n "$sess" ] && key="${sess}__${win}.${pidx}__$(slug "$cwd")"
+fi
+
+# Claude's own project dir may be encoded from the logical path, so try resolved
+# first and fall back to logical.
+proj="$PROJECTS_DIR/$(slug "$cwd")"
+[ -d "$proj" ] || proj="$PROJECTS_DIR/$(slug "$PWD")"
+transcript_exists() { [ -f "$proj/$1.jsonl" ]; }
+
+# 1. exact per-pane record
+if [ -n "$key" ] && [ -f "$SESSIONS_DIR/$key" ]; then
+  id=$(cat "$SESSIONS_DIR/$key" 2>/dev/null)
+  if [ -n "$id" ] && transcript_exists "$id"; then
+    note "claude-resurrect: resuming ${id%%-*} (recorded for this pane)"
+    exec "$CLAUDE_BIN" --resume "$id" "$@"
+  fi
+  [ -n "$id" ] && warn "claude-resurrect: recorded session ${id%%-*} has no transcript — falling back"
+fi
+
+# 2/3. fall back to what the cwd offers
+n=0
+newest=""
+if [ -d "$proj" ]; then
+  for f in "$proj"/*.jsonl; do
+    [ -e "$f" ] || continue
+    n=$((n + 1))
+    [ -z "$newest" ] && newest="$f"
+    [ "$f" -nt "$newest" ] && newest="$f"
+  done
+fi
+
+case "$n" in
+  0)
+    note "claude-resurrect: no previous session for this directory — starting fresh"
+    exec "$CLAUDE_BIN" "$@"
+    ;;
+  1)
+    id=$(basename "$newest" .jsonl)
+    note "claude-resurrect: resuming ${id%%-*} (only session for this directory)"
+    exec "$CLAUDE_BIN" --resume "$id" "$@"
+    ;;
+  *)
+    warn "claude-resurrect: $n sessions for this directory and no record for this pane;"
+    warn "  using --continue (most recent). If it adopted the wrong history, run:"
+    warn "  $CLAUDE_BIN --resume"
+    exec "$CLAUDE_BIN" --continue "$@"
+    ;;
+esac
