@@ -1,0 +1,269 @@
+#!/usr/bin/env bash
+# List and bulk-delete Chrome's saved tab groups — the ones pinned to the
+# bookmarks bar. Chrome only offers right-click-delete on one chip at a time,
+# which does not scale once a group per ticket has piled up.
+#
+# Groups live in the profile's sync store, so this reads and writes LevelDB
+# behind Chrome's back. That shapes what is possible:
+#   · Listing works any time. With Chrome up its lock makes the store
+#     unopenable, so reads run against a throwaway copy instead.
+#   · Deleting needs Chrome fully quit — it holds the data in memory and would
+#     write it straight back. Either quit it yourself, or pass --restart to
+#     have this quit and relaunch it for you.
+#   · The store also holds preferences, search engines, sessions and passkeys.
+#     Every delete backs the whole directory up first and only ever touches
+#     saved_tab_group keys.
+#
+# Groups also sync. With tab group sync on, Chrome re-downloads whatever you
+# delete here on next launch — turn it off first at
+# chrome://settings/syncSetup/advanced.
+#
+# Usage: chrome-tab-groups [options] [filter]
+#   (no filter)         list every saved group
+#   <filter>            list matching groups — a dry run, changes nothing
+#   --delete            actually delete the matched groups
+#   --restart           with --delete, quit Chrome first and relaunch after
+#   --regex             treat the filter as a regex, not a substring
+#   --all               with --delete, operate on every group
+#   --profile <name>    Chrome profile directory (default: last used)
+#   --db <path>         target a LevelDB directly, skipping profile lookup
+#   -y, --yes           skip the --restart confirmation (for hooks)
+#   -q, --quiet         suppress the summary line
+#   -h, --help          this text
+#
+# Matching is case-insensitive substring on the group title: `SQ2-13` hits
+# every group containing it — "rake SQ2-1365", "SQ2-1317", "Panda SQ2-1367".
+# Always look at the dry-run list before adding --delete.
+#
+# --restart quits Chrome cleanly, but your open tabs only come back if the
+# profile is set to "Continue where you left off". When it is not, this says so
+# and asks before quitting; --yes accepts that in advance.
+#
+# Exit: 0 ok · 1 usage/error · 2 Chrome is running · 3 filter matched nothing
+#
+# Env: CHROME_TAB_GROUPS_NODE  node binary to use
+#      CHROME_USER_DATA_DIR    Chrome data dir (default: the macOS location)
+
+set -uo pipefail
+
+G=$'\033[38;2;166;227;161m'; Y=$'\033[38;2;249;226;175m'
+R=$'\033[38;2;243;139;168m'; D=$'\033[2m'; X=$'\033[0m'
+
+die() { printf '%schrome-tab-groups: %s%s\n' "$R" "$1" "$X" >&2; exit "${2:-1}"; }
+
+tmp=""
+cleanup() { [ -n "$tmp" ] && rm -rf "$tmp"; }
+trap cleanup EXIT
+
+# Resolve through the install.sh symlink so the helper next to the real script
+# is found. macOS has no `readlink -f`, hence the loop.
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+done
+here="$(cd -P "$(dirname "$src")" && pwd)"
+
+filter=""; delete=0; regex=0; all=0; quiet=0; restart=0; assume_yes=0
+profile=""; db=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --delete)  delete=1; shift ;;
+    --restart) restart=1; shift ;;
+    --regex)   regex=1; shift ;;
+    --all)     all=1; shift ;;
+    --profile) profile="${2:-}"; [ -n "$profile" ] || die "--profile expects a name"; shift 2 ;;
+    --db)      db="${2:-}"; [ -n "$db" ] || die "--db expects a path"; shift 2 ;;
+    -y|--yes)  assume_yes=1; shift ;;
+    -q|--quiet) quiet=1; shift ;;
+    # Prints the header block. Derived, not a hardcoded line range, so editing
+    # the comment above can't silently truncate --help.
+    -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$src"; exit 0 ;;
+    -*)        die "unknown option: $1" ;;
+    *)         [ -z "$filter" ] || die "only one filter allowed (got '$filter' and '$1')"
+               filter="$1"; shift ;;
+  esac
+done
+
+[ "$all" -eq 1 ] && [ -n "$filter" ] && die "--all and a filter are mutually exclusive"
+[ "$restart" -eq 1 ] && [ "$delete" -eq 0 ] && die "--restart only means anything with --delete"
+[ "$delete" -eq 1 ] && [ "$all" -eq 0 ] && [ -z "$filter" ] &&
+  die "--delete needs a filter (or --all to delete every group)"
+
+# nvm only initialises for interactive shells, so a bare `node` shebang breaks
+# under cron, tmux hooks and xargs. Fall back to the newest nvm install.
+NODE="${CHROME_TAB_GROUPS_NODE:-}"
+if [ -z "$NODE" ]; then
+  NODE="$(command -v node 2>/dev/null)"
+fi
+if [ -z "$NODE" ]; then
+  NODE="$(ls -d "${NVM_DIR:-$HOME/.nvm}"/versions/node/*/bin/node 2>/dev/null | sort -V | tail -1)"
+fi
+[ -n "$NODE" ] && [ -x "$NODE" ] ||
+  die "no node binary found — set CHROME_TAB_GROUPS_NODE, or install node"
+
+helper="$here/lib/tabgroups.mjs"
+[ -f "$helper" ] || die "helper not found at $helper"
+[ -d "$here/node_modules/classic-level" ] ||
+  die "dependencies missing — run: npm install --prefix '$here'"
+
+# Resolve the profile only when the caller has not pointed us at a store.
+prefs=""
+if [ -z "$db" ]; then
+  data_dir="${CHROME_USER_DATA_DIR:-$HOME/Library/Application Support/Google/Chrome}"
+  [ -d "$data_dir" ] || die "Chrome data dir not found: $data_dir"
+
+  if [ -z "$profile" ]; then
+    profile="$("$NODE" -e '
+      const fs = require("fs")
+      try {
+        const state = JSON.parse(fs.readFileSync(process.argv[1], "utf8"))
+        process.stdout.write(state.profile?.last_used || "Default")
+      } catch { process.stdout.write("Default") }
+    ' "$data_dir/Local State" 2>/dev/null)"
+    [ -n "$profile" ] || profile="Default"
+  fi
+
+  db="$data_dir/$profile/Sync Data/LevelDB"
+  [ -d "$db" ] || die "no sync store for profile '$profile' (looked in $db)"
+  prefs="$data_dir/$profile/Preferences"
+fi
+
+chrome_running() { pgrep -x "Google Chrome" >/dev/null 2>&1; }
+
+# Chrome's lock makes the live store unopenable, so reads work off a copy.
+# A copy can catch a half-written trailing log record; LevelDB skips those, so
+# the worst case is missing a group created moments ago. Good enough to list,
+# never used to delete.
+snapshot() {
+  tmp="$(mktemp -d)" || die "could not create a temp directory"
+  cp -R "$db" "$tmp/db" || die "could not copy the store for reading"
+  rm -f "$tmp/db/LOCK"
+  printf '%s\n' "$tmp/db"
+}
+
+list_args=(list)
+if [ "$all" -eq 1 ] || [ -z "$filter" ]; then
+  list_args+=(--all)
+else
+  list_args+=(--filter "$filter")
+  [ "$regex" -eq 1 ] && list_args+=(--regex)
+fi
+
+# Sets guids/count/total_tabs from a TSV listing, printing the table as it goes.
+guids=(); count=0; total_tabs=0
+collect() { # tsv show
+  guids=(); count=0; total_tabs=0
+  while IFS=$'\t' read -r guid tabs color title; do
+    [ -n "$guid" ] || continue
+    guids+=(--guid "$guid")
+    total_tabs=$(( total_tabs + tabs ))
+    count=$(( count + 1 ))
+    [ "$2" -eq 1 ] || continue
+    printf '  %s%-8s%s %s%2d tab%s%s  %s\n' \
+      "$D" "$color" "$X" "$D" "$tabs" "$([ "$tabs" -eq 1 ] || echo s)" "$X" "${title:-(unnamed)}"
+  done <<< "$1"
+}
+
+# Deleting with Chrome up needs it gone first; listing does not.
+read_db="$db"
+if chrome_running; then
+  [ "$delete" -eq 1 ] && [ "$restart" -eq 0 ] &&
+    die "Chrome is running — quit it first (⌘Q), or pass --restart to do it for you" 2
+  read_db="$(snapshot)"
+fi
+
+matched="$("$NODE" "$helper" "${list_args[@]}" --db "$read_db")" || exit 1
+if [ -z "$matched" ]; then
+  [ "$quiet" -eq 1 ] || printf '%sno groups matched%s\n' "$Y" "$X" >&2
+  exit 3
+fi
+collect "$matched" 1
+
+if [ "$delete" -eq 0 ]; then
+  [ "$quiet" -eq 1 ] || printf '%s%d group%s, %d tabs — dry run, nothing deleted%s\n' \
+    "$D" "$count" "$([ "$count" -eq 1 ] || echo s)" "$total_tabs" "$X"
+  exit 0
+fi
+
+# --- from here on we are deleting ------------------------------------------
+
+restarted=0
+if chrome_running; then
+  # Quitting is only safe to do quietly when Chrome will bring the tabs back.
+  # Anything else is a surprise worth one confirmation.
+  warning="Chrome will be quit and relaunched."
+  if [ -n "$prefs" ]; then
+    setting="$("$NODE" -e '
+      const fs = require("fs")
+      try {
+        const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"))
+        process.stdout.write(String(p.session?.restore_on_startup ?? ""))
+      } catch { process.stdout.write("") }
+    ' "$prefs" 2>/dev/null)"
+    # 1 = continue where you left off, 6 = that plus specific pages. Anything
+    # else (including the key being absent, which is the default) means tabs
+    # do not come back on their own.
+    [ "$setting" = "1" ] || [ "$setting" = "6" ] ||
+      warning="Chrome will be quit and relaunched, and this profile is NOT set to
+  \"Continue where you left off\" — your open tabs will not reopen by themselves
+  (History › Recently Closed still has them)."
+  fi
+
+  if [ "$assume_yes" -eq 0 ]; then
+    [ -t 0 ] || die "refusing to quit Chrome unattended — pass --yes if that is what you want"
+    printf '%s%s%s\n' "$Y" "$warning" "$X" >&2
+    printf 'Quit Chrome and delete %d group%s? [y/N] ' "$count" "$([ "$count" -eq 1 ] || echo s)" >&2
+    read -r reply
+    case "$reply" in [yY]*) ;; *) die "aborted" ;; esac
+  fi
+
+  osascript -e 'quit app "Google Chrome"' >/dev/null 2>&1 ||
+    die "could not tell Chrome to quit"
+  waited=0
+  while chrome_running; do
+    if [ "$waited" -ge 200 ]; then
+      die "Chrome is still running after 20s — it may be showing a dialog" 2
+    fi
+    sleep 0.1
+    waited=$(( waited + 1 ))
+  done
+  restarted=1
+
+  # The listing above came from a snapshot; re-resolve against the real store
+  # now that it is unlocked, so the guids are the ones actually on disk.
+  matched="$("$NODE" "$helper" "${list_args[@]}" --db "$db")" || exit 1
+  if [ -z "$matched" ]; then
+    [ "$restarted" -eq 1 ] && open -a "Google Chrome"
+    die "groups vanished between listing and deleting — nothing done" 3
+  fi
+  collect "$matched" 0
+fi
+
+# The store is shared with preferences, sessions and passkeys — never write
+# without a way back.
+backup="$db.backup-$(date +%Y%m%d-%H%M%S)"
+cp -R "$db" "$backup" || die "backup failed, refusing to delete"
+rm -f "$backup/LOCK"
+
+summary="$("$NODE" "$helper" delete --db "$db" "${guids[@]}")" || {
+  printf '%srestore with: rm -rf %q && mv %q %q%s\n' "$R" "$db" "$backup" "$db" "$X" >&2
+  [ "$restarted" -eq 1 ] && open -a "Google Chrome"
+  die "delete failed"
+}
+
+IFS=$'\t' read -r del_groups del_tabs del_keys <<< "$summary"
+
+[ "$restarted" -eq 1 ] && open -a "Google Chrome"
+
+if [ "$quiet" -eq 0 ]; then
+  printf '%s✓ deleted %s group%s and %s tabs (%s keys)%s\n' \
+    "$G" "$del_groups" "$([ "$del_groups" -eq 1 ] || echo s)" "$del_tabs" "$del_keys" "$X"
+  printf '%sbackup: %s%s\n' "$D" "$backup" "$X"
+  [ "$restarted" -eq 1 ] && printf '%srelaunched Chrome%s\n' "$D" "$X"
+  printf '%sif these come back, turn off tab group sync at chrome://settings/syncSetup/advanced%s\n' "$Y" "$X"
+fi
+
+exit 0
