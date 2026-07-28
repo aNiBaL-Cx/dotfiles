@@ -15,6 +15,31 @@ for f in "$repo"/tmux/scripts/*; do
   echo "linked ~/.config/tmux/scripts/$(basename "$f")"
 done
 
+# Claude Code: the hooks + statusline that feed the tmux status bar, agent TUI,
+# notifications and claude-resurrect, plus the global writing guidelines. Per-file
+# again, so machine-local hooks can sit alongside these.
+#
+# Deliberately NOT linked:
+#   settings.json       — the tracked copy is portable ($HOME paths, no
+#                         Orca-managed entries); the live one has absolute paths
+#                         and Orca's 10 hook entries, which the app rewrites.
+#                         Linking would strip them, Orca would put them back, and
+#                         the two would fight forever. Wire it by hand.
+#   settings.local.json — per-machine permission grants (gitignored).
+#   skills/             — symlinked in from the notes vault, and ln -sfn into an
+#                         existing real directory nests the link inside it.
+mkdir -p "$HOME/.claude/hooks"
+for f in "$repo"/.claude/hooks/*; do
+  [ -e "$f" ] || continue
+  chmod +x "$f"
+  ln -sfn "$f" "$HOME/.claude/hooks/$(basename "$f")"
+  echo "linked ~/.claude/hooks/$(basename "$f")"
+done
+chmod +x "$repo/.claude/statusline-command.sh"
+ln -sfn "$repo/.claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
+ln -sfn "$repo/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+echo "linked ~/.claude/statusline-command.sh ~/.claude/CLAUDE.md"
+
 # Whole-dir link; ln -sfn into an existing real directory would nest the link
 # inside it, so require it to be moved aside first.
 if [ -d "$HOME/.config/nvim" ] && [ ! -L "$HOME/.config/nvim" ]; then

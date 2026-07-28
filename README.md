@@ -75,8 +75,10 @@ git clone https://github.com/aNiBaL-Cx/dotfiles ~/projects/dotfiles
 ~/projects/dotfiles/install.sh
 ```
 
-Symlinks `tmux/tmux.conf` → `~/.tmux.conf` and each script into
+Symlinks `tmux/tmux.conf` → `~/.tmux.conf`, each script into
 `~/.config/tmux/scripts/` (per-file, so local-only scripts can coexist),
+`.claude/hooks/*` + `.claude/statusline-command.sh` + `.claude/CLAUDE.md` into
+`~/.claude/`,
 `nvim/` → `~/.config/nvim` (whole dir; an existing real directory is skipped —
 move it aside first), `zsh/*` → `~/.zshrc`, `~/.zprofile`, `~/.zshenv`,
 `~/.aliases`, `chrome/chrome-tab-groups` → `~/.local/bin/`, and clones TPM if
@@ -87,6 +89,13 @@ missing. Then inside tmux: `prefix + I` to install plugins.
 
 Machine-local config goes in `~/.tmux.conf.local` and `~/.zshrc.local`
 (both sourced last, if present).
+
+`~/.claude/settings.json` is **not** linked and must be wired by hand: the tracked
+copy is portable (`$HOME` paths) while a live one picks up absolute paths and any
+agent-hook entries other tools manage — linking would strip those and they would
+be reinstalled, so the two would fight. `settings.local.json` (per-machine
+permission grants) is gitignored, and `.claude/skills/` is left alone because
+those are symlinked in from elsewhere.
 
 ## Tests
 
