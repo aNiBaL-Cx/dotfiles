@@ -60,13 +60,19 @@ delete backs the store up first and only ever touches `saved_tab_group` keys.
 Groups re-sync unless tab group sync is off. `--help` for the rest.
 
 **Claude Code integration (optional).** The status bar shows the active pane's
-Claude statusline; window tabs turn red when an agent finishes while you're not
-looking; and a notification (macOS banner, plus ntfy/Pushover when configured)
-reaches you outside tmux. Fed by Claude Code hooks (statusLine command +
-Stop/Notification hooks writing `/tmp/claude-statusline-<pane>`,
-`/tmp/agent-state-<pane>`, `~/.claude/pane-sessions/`, and window-format
-overrides) that live outside this repo — without them the segments simply stay
-empty and `claude-resurrect` falls back to `--continue`.
+Claude statusline — model, a 10-slot context bar, and rate-limit usage when the
+API reports it (`Opus 5 [██████░░░░] 62% · 5h:19% · 7d:65%`); window tabs turn
+red when an agent finishes while you're not looking; and a notification (macOS
+banner, plus ntfy/Pushover when configured) reaches you outside tmux. Fed by
+Claude Code hooks (statusLine command + Stop/Notification hooks writing
+`/tmp/claude-statusline-<pane>`, `/tmp/agent-state-<pane>`,
+`~/.claude/pane-sessions/`, and window-format overrides) — without them the
+segments simply stay empty and `claude-resurrect` falls back to `--continue`.
+
+`statusline-command.sh` picks its output channel from `$TMUX_PANE`: under tmux
+it writes the pane file only, so the string isn't shown twice; anywhere else
+(Orca's PTYs, a plain terminal) it prints to stdout and Claude Code renders the
+status line itself.
 
 ## Install
 
