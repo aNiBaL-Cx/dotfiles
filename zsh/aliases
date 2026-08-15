@@ -28,7 +28,7 @@ kkr() {
 alias ll="ls -lah"
 alias gs="git status"
 alias gp="git pull"
-alias gd="git diff"
+alias gd="git diff origin/master"
 alias gdc="git diff --cached"
 alias gdom="git diff origin/master"
 alias gres="git restore --source=origin/master"
