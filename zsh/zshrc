@@ -49,6 +49,23 @@ unset _tmux_zsh
 
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
 
+# Terminal/pane title: parent repo folder, plus worktree name when inside one
+DISABLE_AUTO_TITLE=true
+
+_repo_pane_title() {
+  local common repo leaf
+  common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+  if [[ -z $common ]]; then print -Pn "\e]2;%1~\a"; return; fi
+  repo=${${common:h}:t}
+  leaf=${$(git rev-parse --show-toplevel):t}
+  if [[ $leaf == $repo ]]; then
+    print -n "\e]2;${repo}\a"
+  else
+    print -n "\e]2;${repo}/${leaf}\a"
+  fi
+}
+precmd_functions+=(_repo_pane_title)
+
 # Claude Code without permission prompts
 yolo() {
   claude --dangerously-skip-permissions "$@"
