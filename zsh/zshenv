@@ -1,1 +1,11 @@
+# Homebrew on PATH for NON-INTERACTIVE shells too. `ssh host cmd` reads only
+# /etc/zshenv + ~/.zshenv (not zprofile/zshrc), and mosh starts mosh-server
+# exactly that way — without this it dies with "mosh-server: command not found"
+# while working fine in an interactive session. Guarded so it doesn't add a
+# fourth duplicate on top of the brew shellenv in zprofile and zshrc.
+case ":$PATH:" in
+  *":/opt/homebrew/bin:"*) ;;
+  *) export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH" ;;
+esac
+
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
