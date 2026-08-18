@@ -15,6 +15,29 @@ for f in "$repo"/tmux/scripts/*; do
   echo "linked ~/.config/tmux/scripts/$(basename "$f")"
 done
 
+# Starts the tmux server at login with no GUI, so @continuum-restore brings the
+# last session back after a reboot (replaces @continuum-boot — see tmux.conf).
+#
+# The plist sets EnvironmentVariables/PATH on purpose: launchd's default PATH is
+# /usr/bin:/bin:/usr/sbin:/sbin, and the server passes its own PATH to every
+# run-shell job, so a server started by this agent leaves tpm, catppuccin,
+# continuum and resurrect unable to find the `tmux` they shell out to. It fails
+# silently — default green status bar, no theme, no restore, empty boot log.
+mkdir -p "$HOME/Library/LaunchAgents"
+ln -sfn "$repo/tmux/com.anibal.tmux.plist" "$HOME/Library/LaunchAgents/com.anibal.tmux.plist"
+echo "linked ~/Library/LaunchAgents/com.anibal.tmux.plist"
+
+# Re-bootstrap so an edited plist takes effect now instead of at next login.
+# bootout fails when it isn't loaded yet, bootstrap fails when it already is —
+# hence the guards, with launchctl print as the actual check.
+launchctl bootout "gui/$(id -u)/com.anibal.tmux" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.anibal.tmux.plist" 2>/dev/null || true
+if launchctl print "gui/$(id -u)/com.anibal.tmux" >/dev/null 2>&1; then
+  echo "loaded com.anibal.tmux"
+else
+  echo "WARNING: com.anibal.tmux not loaded — launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.anibal.tmux.plist"
+fi
+
 # Claude Code: the hooks + statusline that feed the tmux status bar, agent TUI,
 # notifications and claude-resurrect, plus the global writing guidelines. Per-file
 # again, so machine-local hooks can sit alongside these.
