@@ -87,8 +87,17 @@ Symlinks `tmux/tmux.conf` → `~/.tmux.conf`, each script into
 `~/.claude/`,
 `nvim/` → `~/.config/nvim` (whole dir; an existing real directory is skipped —
 move it aside first), `zsh/*` → `~/.zshrc`, `~/.zprofile`, `~/.zshenv`,
-`~/.aliases`, `chrome/chrome-tab-groups` → `~/.local/bin/`, and clones TPM if
-missing. Then inside tmux: `prefix + I` to install plugins.
+`~/.aliases`, `chrome/chrome-tab-groups` → `~/.local/bin/`,
+`tmux/com.anibal.tmux.plist` → `~/Library/LaunchAgents/` (then re-bootstraps it
+through `launchctl`), and clones TPM if missing. Then inside tmux: `prefix + I`
+to install plugins.
+
+The LaunchAgent starts the tmux server at login with no GUI, so
+`@continuum-restore` brings the last session back after a reboot. It sets `PATH`
+explicitly because launchd's default omits `/opt/homebrew/bin` and the server
+hands its `PATH` to every `run-shell` job — without it, tpm, catppuccin,
+continuum and resurrect all fail silently on the `tmux` they shell out to, and
+you get a default green status bar with no theme and no session restore.
 
 `chrome-tab-groups` needs one npm package; `install.sh` fetches it into
 `chrome/node_modules/` (untracked) when npm is available.
