@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restore the Claude session that belonged to THIS pane, then exec into it.
+# Restore the Claude session that belonged to THIS pane, ready to start on Enter.
 # Referenced from @resurrect-processes in ~/.tmux.conf.
 #
 # Why not plain `claude --continue`: --continue resumes the most recent session
@@ -32,6 +32,34 @@ warn() { printf '%s%s%s\n' "$Y" "$1" "$X" >&2; }
 
 slug() { printf '%s' "$1" | sed 's/[/.]/-/g'; }
 
+# Restoring 12 panes at once cost ~1.5 GB before a key was pressed: an idle
+# resumed session still holds its full heap (~130 MB), and continuum brings
+# every claude pane back when the tmux server starts. So resolve the session as
+# before, then TYPE the command into the pane and stop — the process starts when
+# you press Enter. Pane, cwd and per-pane session id all survive; memory is only
+# spent on the sessions you actually open.
+#
+# Only lazy under tmux, where there is a pane to type into. Run by hand, or with
+# CLAUDE_RESURRECT_EAGER=1, it launches immediately as it always did.
+if [ -z "${CLAUDE_RESURRECT_EAGER:-}" ] && [ -n "${TMUX:-}" ] && [ -n "${TMUX_PANE:-}" ]; then
+  LAZY=1; VERB="queued"; FRESH="queued a fresh session"
+else
+  LAZY=""; VERB="resuming"; FRESH="starting fresh"
+fi
+
+# send-keys has to land AFTER this script exits and the shell redraws its
+# prompt, hence the detached sleep. -l sends the string literally, so nothing in
+# it is read as a key name. TMUX_PANE is captured because the subshell outlives
+# us, and %q quotes the argv so a path with spaces survives the round trip.
+launch() {
+  [ -z "$LAZY" ] && exec "$@"
+  pane="$TMUX_PANE"
+  cmd=$(printf '%q ' "$@"); cmd=${cmd% }
+  ( sleep 0.4; tmux send-keys -t "$pane" -l "$cmd" ) >/dev/null 2>&1 &
+  note "  press Enter to start it"
+  exit 0
+}
+
 # agent-state.sh keys the record off tmux's pane_current_path, which is fully
 # RESOLVED, so resolve here too — otherwise a symlinked worktree root makes the
 # keys diverge and the lookup silently degrades to --continue, i.e. the bug this
@@ -55,8 +83,8 @@ transcript_exists() { [ -f "$proj/$1.jsonl" ]; }
 if [ -n "$key" ] && [ -f "$SESSIONS_DIR/$key" ]; then
   id=$(cat "$SESSIONS_DIR/$key" 2>/dev/null)
   if [ -n "$id" ] && transcript_exists "$id"; then
-    note "claude-resurrect: resuming ${id%%-*} (recorded for this pane)"
-    exec "$CLAUDE_BIN" --resume "$id" "$@"
+    note "claude-resurrect: $VERB ${id%%-*} (recorded for this pane)"
+    launch "$CLAUDE_BIN" --resume "$id" "$@"
   fi
   [ -n "$id" ] && warn "claude-resurrect: recorded session ${id%%-*} has no transcript — falling back"
 fi
@@ -75,18 +103,18 @@ fi
 
 case "$n" in
   0)
-    note "claude-resurrect: no previous session for this directory — starting fresh"
-    exec "$CLAUDE_BIN" "$@"
+    note "claude-resurrect: no previous session for this directory — $FRESH"
+    launch "$CLAUDE_BIN" "$@"
     ;;
   1)
     id=$(basename "$newest" .jsonl)
-    note "claude-resurrect: resuming ${id%%-*} (only session for this directory)"
-    exec "$CLAUDE_BIN" --resume "$id" "$@"
+    note "claude-resurrect: $VERB ${id%%-*} (only session for this directory)"
+    launch "$CLAUDE_BIN" --resume "$id" "$@"
     ;;
   *)
     warn "claude-resurrect: $n sessions for this directory and no record for this pane;"
     warn "  using --continue (most recent). If it adopted the wrong history, run:"
     warn "  $CLAUDE_BIN --resume"
-    exec "$CLAUDE_BIN" --continue "$@"
+    launch "$CLAUDE_BIN" --continue "$@"
     ;;
 esac
