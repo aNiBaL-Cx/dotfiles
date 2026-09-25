@@ -2,12 +2,17 @@
 # Worktree picker across sibling repos, grouped by worktree name (e.g. a
 # ticket slug reused across several repos).
 #
-# Pick a name -> its worktree in the CURRENT repo is opened (or the first, if
-# the current repo isn't in the group). If the current pane is an idle shell it
-# is reused (cd in place); if it is busy (claude session, dev server, ...) a new
-# pane is opened instead, since a cd would just type into that program.
-# If the name also exists in OTHER repos, you're asked whether to open those in
-# new panes too.
+# Two ways to open the pick:
+#
+#   enter   SESSION mode (default) — one session named after the worktree, one
+#           window per repo in the group. Switches to it; an existing session
+#           with that name is reused, never rebuilt.
+#   ctrl-p  PANE mode (the original) — its worktree in the CURRENT repo is
+#           opened (or the first, if the current repo isn't in the group). An
+#           idle shell pane is reused (cd in place); a busy one (claude session,
+#           dev server, ...) gets a new pane instead, since a cd would just type
+#           into that program. If the name also exists in OTHER repos, you're
+#           asked whether to open those in new panes too.
 #
 # Root of repos: $WORKTREE_ROOT if set, else inferred as the parent directory
 # of the current repo's primary checkout (a "folder of repos" layout).
@@ -72,32 +77,58 @@ inventory="$(
 [ -n "$inventory" ] || die "no worktrees found under $root"
 
 # Grouped picker: one row per worktree name + the repos it spans.
-sel="$(
+out="$(
   printf '%s\n' "$inventory" \
     | awk -F"$tab" '{ if (!($1 in seen)) order[++n]=$1; seen[$1]; repos[$1]=repos[$1] (repos[$1]?", ":"") $2 }
                     END { for (i=1;i<=n;i++) printf "%s\t%s\n", order[i], repos[order[i]] }' \
     | sort \
     | fzf --delimiter="$tab" --with-nth=1,2 \
           --prompt='worktree > ' --height=60% --reverse \
-    | cut -f1
+          --expect=ctrl-p \
+          --header='enter session · ctrl-p panes'
 )"
+# With --expect, fzf prints the pressed key (empty line for a plain enter) first.
+key="$(printf '%s\n' "$out" | sed -n 1p)"
+sel="$(printf '%s\n' "$out" | sed -n 2p | cut -f1)"
 [ -n "$sel" ] || exit 0
 
-# All worktree paths for the selected name.
-paths=()
-while IFS= read -r p; do [ -n "$p" ] && paths+=("$p"); done < <(
-  printf '%s\n' "$inventory" | awk -F"$tab" -v s="$sel" '$1==s{print $3}'
+# All worktree paths for the selected name, with the repo each one belongs to
+# (the repo names the window in session mode).
+paths=(); wt_repos=()
+while IFS="$tab" read -r r p; do
+  [ -n "$p" ] || continue
+  wt_repos+=("$r"); paths+=("$p")
+done < <(
+  printf '%s\n' "$inventory" | awk -F"$tab" -v s="$sel" '$1==s{print $2 FS $3}'
 )
 [ "${#paths[@]}" -gt 0 ] || die "no paths for '$sel'"
 
-# Current-pane target = the group member under the current repo, else the first.
-primary=""
+# Primary = the group member under the current repo, else the first.
+primary_i=-1
 if [ -n "$cur_repo" ]; then
-  for p in "${paths[@]}"; do
-    case "$p" in "$cur_repo"/*|"$cur_repo") primary="$p"; break ;; esac
+  for i in "${!paths[@]}"; do
+    case "${paths[$i]}" in "$cur_repo"/*|"$cur_repo") primary_i=$i; break ;; esac
   done
 fi
-[ -n "$primary" ] || primary="${paths[0]}"
+[ "$primary_i" -ge 0 ] || primary_i=0
+primary="${paths[$primary_i]}"
+
+# SESSION MODE (default): the worktree name is the session, each repo a window.
+# Session names can't hold "." or ":" (tmux parses them as target separators).
+if [ "$key" != "ctrl-p" ]; then
+  name="$(printf '%s' "$sel" | tr ':.' '--')"
+  if ! tmux has-session -t "=$name" 2>/dev/null; then
+    first_win="$(tmux new-session -d -s "$name" -c "$primary" -n "${wt_repos[$primary_i]}" \
+                   -P -F '#{window_id}')" || die "could not create session '$name'"
+    for i in "${!paths[@]}"; do
+      [ "$i" -eq "$primary_i" ] && continue
+      tmux new-window -t "=$name" -c "${paths[$i]}" -n "${wt_repos[$i]}"
+    done
+    tmux select-window -t "$first_win"
+  fi
+  tmux switch-client -t "=$name"
+  exit 0
+fi
 
 # If the current pane is an idle shell, reuse it (cd in place). If it is busy
 # (a claude session, dev server, etc.) a cd would just type into that program,
