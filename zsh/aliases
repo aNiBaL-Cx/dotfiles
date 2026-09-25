@@ -44,6 +44,13 @@ alias ktmux="tmux kill-server"
 alias t='tmux'
 alias ta='tmux attach -t'
 
+# Herdr
+alias h='herdr'
+alias ha='herdr session attach'
+alias hls='herdr session list'
+alias hag='herdr agent list | jq -r ".result.agents[] | \"\(.pane_id)\t\(.agent_status)\t\(.name // \"-\")\t\(.cwd)\""'
+alias hw='herdr worktree list'
+
 # Claude
 alias cl="claude"
 alias cla="claude --file .claude/ARCHITECTURE.md"
