@@ -73,3 +73,10 @@ yolo() {
 
 # Machine-local config (not tracked) — work env, host-specific PATH, extras
 [ -f ~/.zshrc.local ] && source ~/.zshrc.local
+
+
+# Added by Antigravity CLI installer
+export PATH="/Users/anibal/.local/bin:$PATH"
+
+# Added by Devin
+export PATH="/Users/anibal/.codeium/windsurf/bin:$PATH"
