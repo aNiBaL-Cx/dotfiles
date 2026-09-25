@@ -6,9 +6,9 @@ Personal tmux + zsh + nvim setup for an AI-agent-heavy workflow on macOS
 ## What's in it
 
 **Modal workflow, tmux-native.** Zellij-style sticky modes (pane / tab / resize /
-session / scroll) entered with the prefix (`Ctrl+Space`), with a bottom hint bar
-that shows the active mode's keys — no prefixless captures, so `Ctrl+t/p/n/s`
-stay free for the shell and editors.
+session / scroll) entered with the prefix (`Ctrl-b`, tmux default), with a bottom
+hint bar that shows the active mode's keys — no prefixless captures, so
+`Ctrl+t/p/n/s` stay free for the shell and editors.
 
 **Agent tooling** (popups + a docked sidebar):
 
