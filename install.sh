@@ -15,6 +15,13 @@ for f in "$repo"/tmux/scripts/*; do
   echo "linked ~/.config/tmux/scripts/$(basename "$f")"
 done
 
+# Single-file link: the rest of ~/.config/herdr is runtime state (sockets, logs,
+# session.json). Herdr writes config.toml itself (settings screen, onboarding);
+# if a save ever replaces the link with a plain file, copy it back here.
+mkdir -p "$HOME/.config/herdr"
+ln -sfn "$repo/herdr/config.toml" "$HOME/.config/herdr/config.toml"
+echo "linked ~/.config/herdr/config.toml"
+
 # Starts the tmux server at login with no GUI, so @continuum-restore brings the
 # last session back after a reboot (replaces @continuum-boot — see tmux.conf).
 #
