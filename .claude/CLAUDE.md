@@ -58,5 +58,8 @@ Rules:
 - Direct, no emotional padding or unnecessary filler phrases
 - Minimal solutions — don't propose architecture where a simple fix will do
 
+**No AI attribution, anywhere**
+Never add `Co-Authored-By: Claude …`, "Generated with Claude Code" or any other AI mention to commits, PR descriptions, or anything else, in any repo. `attribution` in `~/.claude/settings.json` is set to empty strings for the same reason.
+
 **Anti-overengineering rule**
 Prefer the minimal solution that solves the current task. Don't introduce abstractions for anticipated future needs.
