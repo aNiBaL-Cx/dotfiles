@@ -1,0 +1,25 @@
+onboarding = false
+
+[theme]
+name = "one-dark"
+auto_switch = false
+
+# Aligned with ~/.tmux.conf: r reload, n/p tabs, R resize mode, y lazydocker, S-M-arrows resize.
+[keys]
+resize_mode = "prefix+shift+r"
+reload_config = "prefix+r"
+next_tab = "prefix+n"
+previous_tab = "prefix+p"
+move_tab_previous = "prefix+<"
+move_tab_next = "prefix+>"
+resize_pane_left = "shift+alt+left"
+resize_pane_down = "shift+alt+down"
+resize_pane_up = "shift+alt+up"
+resize_pane_right = "shift+alt+right"
+
+[[keys.command]]
+key = "prefix+y"
+type = "popup"
+command = "/opt/homebrew/bin/lazydocker"
+width = "80%"
+height = "85%"
