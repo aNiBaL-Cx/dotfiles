@@ -80,3 +80,8 @@ export PATH="/Users/anibal/.local/bin:$PATH"
 
 # Added by Devin
 export PATH="/Users/anibal/.codeium/windsurf/bin:$PATH"
+
+# Herdr Nudge: a notification when a long command finishes
+if [[ -r ~/.local/state/herdr/plugins/herdr-nudge/herdr-nudge.zsh ]]; then
+  source ~/.local/state/herdr/plugins/herdr-nudge/herdr-nudge.zsh
+fi
