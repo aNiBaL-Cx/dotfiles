@@ -9,7 +9,7 @@ auto_switch = false
 resize_mode = "prefix+shift+r"
 reload_config = "prefix+r"
 next_tab = "prefix+n"
-previous_tab = "prefix+p"
+previous_tab = ""
 move_tab_previous = "prefix+<"
 move_tab_next = "prefix+>"
 resize_pane_left = "shift+alt+left"
@@ -23,3 +23,9 @@ type = "popup"
 command = "/opt/homebrew/bin/lazydocker"
 width = "80%"
 height = "85%"
+
+[[keys.command]]
+key = "prefix+p"
+type = "plugin_action"
+command = "ray.plugin-manager.open"
+description = "open plugin manager"
