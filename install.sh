@@ -101,6 +101,21 @@ if [ ! -d "$repo/chrome/node_modules" ]; then
   fi
 fi
 
+# Obsidian keeps hotkeys per vault, in <vault>/.obsidian/hotkeys.json. Copied, not
+# linked: a symlink target outside the vault breaks on other machines and under
+# MEGA sync. Vaults come from Obsidian's own registry, so re-run after adding one.
+obsidian_registry="$HOME/Library/Application Support/obsidian/obsidian.json"
+if [ -f "$obsidian_registry" ] && command -v python3 >/dev/null 2>&1; then
+  python3 -c 'import json,sys; [print(v["path"]) for v in json.load(open(sys.argv[1]))["vaults"].values()]' "$obsidian_registry" |
+  while IFS= read -r vault; do
+    [ -d "$vault/.obsidian" ] || continue
+    cp "$repo/obsidian/hotkeys.json" "$vault/.obsidian/hotkeys.json"
+    echo "copied hotkeys.json to $vault"
+  done
+else
+  echo "skipped Obsidian hotkeys (no vault registry or python3)"
+fi
+
 if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
   git clone --depth 1 https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
   echo "installed TPM"
