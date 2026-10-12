@@ -85,3 +85,10 @@ export PATH="/Users/anibal/.codeium/windsurf/bin:$PATH"
 if [[ -r ~/.local/state/herdr/plugins/herdr-nudge/herdr-nudge.zsh ]]; then
   source ~/.local/state/herdr/plugins/herdr-nudge/herdr-nudge.zsh
 fi
+
+# >>> grok installer >>>
+export PATH="$HOME/.grok/bin:$PATH"
+fpath=(~/.grok/completions/zsh $fpath)
+autoload -Uz compinit && compinit -C
+# <<< grok installer <<<
+[ -f ~/.zsh_locals ] && source ~/.zsh_locals
