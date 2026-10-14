@@ -1,5 +1,5 @@
-# wt / wtedit — jump into, or open in an editor, git worktrees from any repo
-# under a root.
+# wt / wtedit — jump into, list, remove, or open in an editor, git worktrees
+# from any repo under a root.
 #
 # Terminal-only counterpart to the tmux `prefix + w` popup
 # (tmux/scripts/worktrees.sh): same inventory, no pane handling, so it works in
@@ -79,6 +79,20 @@ _wt_rows() {
   done
 }
 
+# Keep stdin lines whose path + branch contain every word in $@
+# (case-insensitive). The hidden abspath field shares the root with every other
+# line, so matching it would match everything.
+_wt_filter() {
+  local line key word
+  while IFS= read -r line; do
+    key="${line%	*}"
+    for word in "$@"; do
+      [[ "${(L)key}" == *"${(L)word}"* ]] || continue 2
+    done
+    print -r -- "$line"
+  done
+}
+
 # wt — pick a worktree and cd into it.
 #
 # Any args become the initial filter, matched against the worktree PATH (repo
@@ -88,13 +102,47 @@ _wt_rows() {
 #   wt 1400                # matches path or branch
 #   wt 1397 marionette     # narrow by repo
 #   wt feat/SQ2            # matches the branch side
+#
+#   wt -l [words]          # --list: print matching worktrees, no selector
+#   wt -d [words]          # --delete: selector (TAB to multi-select), then
+#                          # `git worktree remove` each pick. Branches stay;
+#                          # dirty worktrees are refused by git.
 wt() {
   # NB: never name a variable `path` here — zsh ties it to $PATH.
-  local base sel
+  local mode=cd base sel tree common
+  case "$1" in
+    -l|--list)   mode=list; shift ;;
+    -d|--delete) mode=delete; shift ;;
+  esac
+
   base=$(_wt_root "$0") || return 1
 
   local -a items=(${(f)"$(_wt_inventory "$base")"})
   (( ${#items} )) || { print -u2 "wt: no worktrees under $base"; return 1 }
+
+  if [[ $mode == list ]]; then
+    items=(${(f)"$(print -rl -- "${items[@]}" | _wt_filter "$@")"})
+    (( ${#items} )) || return 0
+    _wt_rows "${items[@]}" | cut -f1
+    return
+  fi
+
+  if [[ $mode == delete ]]; then
+    # No --select-1: a removal always gets one look before it runs.
+    local -a picks=(${(f)"$(_wt_rows "${items[@]}" |
+          fzf -i --delimiter=$'\t' --with-nth=1 --multi --prompt='remove worktrees > ' \
+              --height=60% --reverse --query="$*" --exit-0 |
+          cut -f2)"})
+    for tree in "${picks[@]}"; do
+      # The primary checkout owns the worktree; run the removal from there.
+      common=$(git -C "$tree" rev-parse --path-format=absolute --git-common-dir) || continue
+      git -C "${common:h}" worktree remove "$tree" || continue
+      print -r -- "wt: removed ${tree#$base/}"
+      # Don't leave the shell in a deleted directory.
+      [[ "$PWD/" == "$tree/"* ]] && cd "${common:h}"
+    done
+    return 0
+  fi
 
   sel=$(_wt_rows "${items[@]}" |
         fzf -i --delimiter=$'\t' --with-nth=1 --prompt='worktree > ' \
@@ -117,7 +165,7 @@ wt() {
 # Editor: $WT_EDITOR, else $VISUAL, else $EDITOR. Flags are allowed
 # (WT_EDITOR="cursor --profile work").
 wtedit() {
-  local ed="${WT_EDITOR:-${VISUAL:-$EDITOR}}" base line key
+  local ed="${WT_EDITOR:-${VISUAL:-$EDITOR}}" base line
   [[ -n "$ed" ]] || { print -u2 "wtedit: set \$WT_EDITOR (or \$VISUAL/\$EDITOR)"; return 1 }
 
   base=$(_wt_root "$0") || return 1
@@ -125,20 +173,9 @@ wtedit() {
   local -a items=(${(f)"$(_wt_inventory "$base")"})
   (( ${#items} )) || { print -u2 "wtedit: no worktrees under $base"; return 1 }
 
-  local -a hits keep
+  local -a hits
   if (( $# )); then
-    # Filter on path + branch only — the hidden abspath field shares the root
-    # with every other line, so matching it would match everything.
-    hits=("${items[@]}")
-    local word
-    for word in "$@"; do
-      keep=()
-      for line in "${hits[@]}"; do
-        key="${line%	*}"
-        [[ "${(L)key}" == *"${(L)word}"* ]] && keep+=("$line")
-      done
-      hits=("${keep[@]}")
-    done
+    hits=(${(f)"$(print -rl -- "${items[@]}" | _wt_filter "$@")"})
     (( ${#hits} )) || { print -u2 "wtedit: no worktrees matching '$*' under $base"; return 1 }
   else
     hits=(${(f)"$(_wt_rows "${items[@]}" |
