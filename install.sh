@@ -70,6 +70,22 @@ ln -sfn "$repo/.claude/statusline-command.sh" "$HOME/.claude/statusline-command.
 ln -sfn "$repo/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 echo "linked ~/.claude/statusline-command.sh ~/.claude/CLAUDE.md"
 
+# Agent skills shared by Claude Code (~/.claude/skills) and Codex/Copilot/Gemini
+# (~/.agents/skills). Per-skill dir links, so vault-linked skills coexist. An
+# existing real directory is skipped — ln -sfn would nest the link inside it.
+for d in "$repo"/agents/skills/*/; do
+  name="$(basename "$d")"
+  for target in "$HOME/.claude/skills" "$HOME/.agents/skills"; do
+    mkdir -p "$target"
+    if [ -d "$target/$name" ] && [ ! -L "$target/$name" ]; then
+      echo "skipped $target/$name (existing directory — move it aside first)"
+    else
+      ln -sfn "${d%/}" "$target/$name"
+      echo "linked $target/$name"
+    fi
+  done
+done
+
 # Whole-dir link; ln -sfn into an existing real directory would nest the link
 # inside it, so require it to be moved aside first.
 if [ -d "$HOME/.config/nvim" ] && [ ! -L "$HOME/.config/nvim" ]; then

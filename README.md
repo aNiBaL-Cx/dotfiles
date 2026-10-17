@@ -110,7 +110,9 @@ copy is portable (`$HOME` paths) while a live one picks up absolute paths and an
 agent-hook entries other tools manage — linking would strip those and they would
 be reinstalled, so the two would fight. `settings.local.json` (per-machine
 permission grants) is gitignored, and `.claude/skills/` is left alone because
-those are symlinked in from elsewhere.
+those are symlinked in from elsewhere. Skills that are not tied to one vault live
+in `agents/skills/`; each is linked per-dir into both `~/.claude/skills/` and
+`~/.agents/skills/` (Codex/Copilot/Gemini read the latter).
 
 ## Tests
 
