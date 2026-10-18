@@ -2,18 +2,18 @@
 name: cheap-dev-team
 description: >
   Use when the user says cheap-dev-team, /cheap-dev-team, "use the herdr panes", or asks to delegate a task
-  across Herdr agents that are already open in the current workspace. Requires HERDR_ENV=1.
+  across cheap Herdr worker agents in the current workspace, open or not. Requires HERDR_ENV=1.
 metadata:
   short-description: Delegate to existing cheap Herdr panes
 ---
 
 # Cheap dev team
 
-Coordinator stays in the current pane and keeps its context small. Workers are agents already running in Herdr. Do not start agents, workspaces, or internal subagents, and do not change a worker's model.
+Coordinator stays in the current pane and keeps its context small. Workers are cheap agents in sibling panes: reuse the ones already running, start the ones the task needs. Do not open workspaces or internal subagents, and do not change a running worker's model.
 
 **REQUIRED BACKGROUND:** `herdr --skill`. Read it if not already in context. It defines `HERDR_ENV`, agent states, prompt gating, and safety rules. This skill does not repeat them.
 
-## Find the panes
+## Find or create the panes
 
 ```bash
 test "${HERDR_ENV:-}" = 1 || echo "not inside Herdr"   # stop if it fails
@@ -32,7 +32,18 @@ A worker is a pane whose `label` equals a role, or a role plus `-N` (`ui`, `dev-
 
 A `-N` suffix shares the parent role. No fifth role unless the user names it.
 
-Defaults are a starting point. The prompt names the exact files each pane owns. A component file that mixes markup and behavior goes to one pane. If a label is missing, assign the role to a free pane and say which. Leave `blocked` or `working` panes alone; a blocked approval is the user's.
+Defaults are a starting point. The prompt names the exact files each pane owns. A component file that mixes markup and behavior goes to one pane. Leave `blocked` or `working` panes alone; a blocked approval is the user's.
+
+Start only the roles this task needs. Missing role: take a free shell pane, or split one from the coordinator; same kind as the coordinator, cheapest tier that fits the role.
+
+```bash
+herdr agent get "$HERDR_PANE_ID"                      # coordinator kind
+herdr pane split --current --direction right --cwd "$PWD" --no-focus   # down when the pane is tall; pane_id in .result.pane
+herdr pane rename <pane_id> dev
+herdr agent start dev --kind <kind> --pane <pane_id> -- <model-args>
+```
+
+Model by role: `ui`, `test`, `review` take the cheapest tier. `dev` takes the cheapest tier too, one step up when the task touches state, concurrency, or data contracts. Model args after `--`: claude `--model <alias>`, codex `-m <model>`, grok `-m <model>`; other kinds, read `<kind> --help`. Take the current cheap model name from that help, not from memory. Agent name = label; names are unique among live agents, so a second `dev` is `dev-1`. Leave started panes open for the next task; close them only when the user asks.
 
 ## One task at a time
 
