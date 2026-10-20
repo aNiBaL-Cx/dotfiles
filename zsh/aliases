@@ -37,6 +37,8 @@ alias ..="cd .."
 alias be="bundle exec"
 alias rdb="bundle exec rails dbconsole"
 alias rr="npm start"
+# HTTPS in front of the backend for OAuth callbacks (Canvas): https://tbs.localhost:3443
+alias https="caddy reverse-proxy --from tbs.localhost:3443 --to localhost:3000 --internal-certs"
 
 # Tmux and friends
 alias mux='tmuxinator'
@@ -64,3 +66,7 @@ alias lg='lazygit'
 
 # Latest commits, subjects only, oldest first (release-notes friendly)
 alias gl4s='git --no-pager log --oneline -10 --format="%s" --reverse'
+
+
+# Codex
+alias codexa='codex --sandbox workspace-write --ask-for-approval never'
