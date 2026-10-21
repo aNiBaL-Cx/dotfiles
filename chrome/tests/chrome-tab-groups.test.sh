@@ -147,6 +147,23 @@ check "backup exists"         0 "$([ -d "$backup" ]; echo $?)"
 rm -rf "$DB" && mv "$backup" "$DB"
 check "restored"              "NEXT,Reviews,SQ2-1095,rake SQ2-1365" "$(titles "$DB")"
 
+echo "-- --apply rewrites title and color only"
+DB=$(fresh)
+printf 'g0000002-0000-0000-0000-000000000002\torange\t🟧 ⏫ SQ2-1095\n' > "$TMP/apply.tsv"
+before=$(keys "$DB")
+check "apply succeeds"        0 "$("$CLI" --db "$DB" --apply "$TMP/apply.tsv" >/dev/null 2>&1; echo $?)"
+check "title changed"         "NEXT,Reviews,rake SQ2-1365,🟧 ⏫ SQ2-1095" "$(titles "$DB")"
+check "color changed"         "orange" "$("$CLI" --db "$DB" --tsv 2>/dev/null | awk -F'\t' '$4 ~ /1095/ {print $3}')"
+check "other color kept"      "purple" "$("$CLI" --db "$DB" --tsv 2>/dev/null | awk -F'\t' '$4 ~ /rake/ {print $3}')"
+check "tab count kept"        1 "$("$CLI" --db "$DB" --tsv 2>/dev/null | awk -F'\t' '$4 ~ /1095/ {print $2}')"
+check "key count unchanged"   "$before" "$(keys "$DB")"
+check "backup written"        0 "$(ls -d "$DB".backup-* >/dev/null 2>&1; echo $?)"
+printf 'nope\tred\tx\n' > "$TMP/bad.tsv"
+check "unknown guid fails"    1 "$("$CLI" --db "$DB" --apply "$TMP/bad.tsv" >/dev/null 2>&1; echo $?)"
+chrome_up
+check "apply blocked"         2 "$("$CLI" --db "$DB" --apply "$TMP/apply.tsv" >/dev/null 2>&1; echo $?)"
+chrome_down
+
 echo "-- --help"
 check "help exits 0"          0 "$("$CLI" --help >/dev/null 2>&1; echo $?)"
 check "help mentions usage"   0 "$("$CLI" --help 2>/dev/null | grep -q 'Usage: chrome-tab-groups'; echo $?)"

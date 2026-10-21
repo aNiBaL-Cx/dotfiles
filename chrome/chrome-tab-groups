@@ -22,7 +22,12 @@
 #   (no filter)         list every saved group
 #   <filter>            list matching groups — a dry run, changes nothing
 #   --delete            actually delete the matched groups
-#   --restart           with --delete, quit Chrome first and relaunch after
+#   --restart           with --delete or --apply, quit Chrome first and relaunch after
+#   --tsv               list as raw TSV: guid, tabs, color, title (for scripts)
+#   --apply <file>      set title and color of existing groups from a TSV file of
+#                       guid, color, title lines (colors: grey blue red yellow
+#                       green pink purple cyan orange). Writes, so it needs Chrome
+#                       quit or --restart, exactly like --delete.
 #   --regex             treat the filter as a regex, not a substring
 #   --all               with --delete, operate on every group
 #   --profile <name>    Chrome profile directory (default: last used)
@@ -65,13 +70,15 @@ while [ -L "$src" ]; do
 done
 here="$(cd -P "$(dirname "$src")" && pwd)"
 
-filter=""; delete=0; regex=0; all=0; quiet=0; restart=0; assume_yes=0
+filter=""; apply_file=""; tsv=0; delete=0; regex=0; all=0; quiet=0; restart=0; assume_yes=0
 profile=""; db=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --delete)  delete=1; shift ;;
     --restart) restart=1; shift ;;
+    --tsv)     tsv=1; shift ;;
+    --apply)   apply_file="${2:-}"; [ -n "$apply_file" ] || die "--apply expects a file"; shift 2 ;;
     --regex)   regex=1; shift ;;
     --all)     all=1; shift ;;
     --profile) profile="${2:-}"; [ -n "$profile" ] || die "--profile expects a name"; shift 2 ;;
@@ -88,7 +95,11 @@ while [ $# -gt 0 ]; do
 done
 
 [ "$all" -eq 1 ] && [ -n "$filter" ] && die "--all and a filter are mutually exclusive"
-[ "$restart" -eq 1 ] && [ "$delete" -eq 0 ] && die "--restart only means anything with --delete"
+[ "$restart" -eq 1 ] && [ "$delete" -eq 0 ] && [ -z "$apply_file" ] &&
+  die "--restart only means anything with --delete or --apply"
+[ -n "$apply_file" ] && [ "$delete" -eq 1 ] && die "--apply and --delete are mutually exclusive"
+[ -n "$apply_file" ] && [ ! -f "$apply_file" ] && die "no such file: $apply_file"
+write=0; { [ "$delete" -eq 1 ] || [ -n "$apply_file" ]; } && write=1
 [ "$delete" -eq 1 ] && [ "$all" -eq 0 ] && [ -z "$filter" ] &&
   die "--delete needs a filter (or --all to delete every group)"
 
@@ -170,7 +181,7 @@ collect() { # tsv show
 # Deleting with Chrome up needs it gone first; listing does not.
 read_db="$db"
 if chrome_running; then
-  [ "$delete" -eq 1 ] && [ "$restart" -eq 0 ] &&
+  [ "$write" -eq 1 ] && [ "$restart" -eq 0 ] &&
     die "Chrome is running — quit it first (⌘Q), or pass --restart to do it for you" 2
   read_db="$(snapshot)"
 fi
@@ -180,15 +191,26 @@ if [ -z "$matched" ]; then
   [ "$quiet" -eq 1 ] || printf '%sno groups matched%s\n' "$Y" "$X" >&2
   exit 3
 fi
+if [ "$tsv" -eq 1 ]; then
+  printf '%s\n' "$matched"
+  exit 0
+fi
 collect "$matched" 1
 
-if [ "$delete" -eq 0 ]; then
+if [ "$write" -eq 0 ]; then
   [ "$quiet" -eq 1 ] || printf '%s%d group%s, %d tabs — dry run, nothing deleted%s\n' \
     "$D" "$count" "$([ "$count" -eq 1 ] || echo s)" "$total_tabs" "$X"
   exit 0
 fi
 
-# --- from here on we are deleting ------------------------------------------
+# --- from here on we are writing -------------------------------------------
+
+if [ -n "$apply_file" ]; then
+  count=$(grep -c . "$apply_file")
+  verb="update"
+else
+  verb="delete"
+fi
 
 restarted=0
 if chrome_running; then
@@ -215,7 +237,7 @@ if chrome_running; then
   if [ "$assume_yes" -eq 0 ]; then
     [ -t 0 ] || die "refusing to quit Chrome unattended — pass --yes if that is what you want"
     printf '%s%s%s\n' "$Y" "$warning" "$X" >&2
-    printf 'Quit Chrome and delete %d group%s? [y/N] ' "$count" "$([ "$count" -eq 1 ] || echo s)" >&2
+    printf 'Quit Chrome and %s %d group%s? [y/N] ' "$verb" "$count" "$([ "$count" -eq 1 ] || echo s)" >&2
     read -r reply
     case "$reply" in [yY]*) ;; *) die "aborted" ;; esac
   fi
@@ -234,25 +256,41 @@ if chrome_running; then
 
   # The listing above came from a snapshot; re-resolve against the real store
   # now that it is unlocked, so the guids are the ones actually on disk.
-  matched="$("$NODE" "$helper" "${list_args[@]}" --db "$db")" || exit 1
-  if [ -z "$matched" ]; then
-    [ "$restarted" -eq 1 ] && open -a "Google Chrome"
-    die "groups vanished between listing and deleting — nothing done" 3
+  if [ -z "$apply_file" ]; then
+    matched="$("$NODE" "$helper" "${list_args[@]}" --db "$db")" || exit 1
+    if [ -z "$matched" ]; then
+      [ "$restarted" -eq 1 ] && open -a "Google Chrome"
+      die "groups vanished between listing and deleting — nothing done" 3
+    fi
+    collect "$matched" 0
   fi
-  collect "$matched" 0
 fi
 
 # The store is shared with preferences, sessions and passkeys — never write
 # without a way back.
 backup="$db.backup-$(date +%Y%m%d-%H%M%S)"
-cp -R "$db" "$backup" || die "backup failed, refusing to delete"
+cp -R "$db" "$backup" || die "backup failed, refusing to write"
 rm -f "$backup/LOCK"
 
-summary="$("$NODE" "$helper" delete --db "$db" "${guids[@]}")" || {
+if [ -n "$apply_file" ]; then
+  summary="$("$NODE" "$helper" update --db "$db" --file "$apply_file")"
+else
+  summary="$("$NODE" "$helper" delete --db "$db" "${guids[@]}")"
+fi || {
   printf '%srestore with: rm -rf %q && mv %q %q%s\n' "$R" "$db" "$backup" "$db" "$X" >&2
   [ "$restarted" -eq 1 ] && open -a "Google Chrome"
-  die "delete failed"
+  die "$verb failed"
 }
+
+if [ -n "$apply_file" ]; then
+  [ "$restarted" -eq 1 ] && open -a "Google Chrome"
+  if [ "$quiet" -eq 0 ]; then
+    printf '%s✓ updated %s group%s%s\n' "$G" "$summary" "$([ "$summary" = 1 ] || echo s)" "$X"
+    printf '%sbackup: %s%s\n' "$D" "$backup" "$X"
+    [ "$restarted" -eq 1 ] && printf '%srelaunched Chrome%s\n' "$D" "$X"
+  fi
+  exit 0
+fi
 
 IFS=$'\t' read -r del_groups del_tabs del_keys <<< "$summary"
 
