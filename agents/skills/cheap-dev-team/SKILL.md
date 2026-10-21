@@ -16,34 +16,42 @@ Coordinator stays in the current pane and keeps its context small. Workers are c
 ## Find or create the panes
 
 ```bash
-test "${HERDR_ENV:-}" = 1 || echo "not inside Herdr"   # stop if it fails
+test "${HERDR_ENV:-}" = 1 || { echo "not inside Herdr"; exit 1; }
 herdr pane list --workspace "$HERDR_WORKSPACE_ID"
 herdr agent list
 ```
 
-A worker is a pane whose `label` equals a role, or a role plus `-N` (`ui`, `dev-2`). Fall back to the agent name. Skip `$HERDR_PANE_ID`. Agent commands take the `pane_id` from the JSON, not the label.
+A worker is a pane whose `label` equals a role, or a role plus `-N` (`ui`, `dev-2`). Fall back to the agent name. Skip `$HERDR_PANE_ID`. Agent name must equal the label: an adopted pane whose agent carries an auto name (`opus-1`) gets `herdr agent rename <pane_id> <label>` first. From then on target workers by name, never by sidebar position.
 
-| Label | Default ownership |
-|---|---|
-| `ui` | Stylesheets, visible copy, static assets |
-| `dev` | Behavior, data wiring, small pure helpers |
-| `test` | Test files |
+| Label    | Default ownership                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------------------------ |
+| `ui`     | Stylesheets, visible copy, static assets                                                                     |
+| `dev`    | Behavior, data wiring, small pure helpers                                                                    |
+| `test`   | Test files                                                                                                   |
 | `review` | None. Read-only notes on the current diff, when the coordinator asks for a second opinion before integrating |
 
 A `-N` suffix shares the parent role. No fifth role unless the user names it.
 
 Defaults are a starting point. The prompt names the exact files each pane owns. A component file that mixes markup and behavior goes to one pane. Leave `blocked` or `working` panes alone; a blocked approval is the user's.
 
-Start only the roles this task needs. Missing role: take a free shell pane, or split one from the coordinator; same kind as the coordinator, cheapest tier that fits the role.
+Start only the roles this task needs. Missing role: take a free shell pane, or split one from the coordinator; same kind as the coordinator, model by role below.
 
 ```bash
 herdr agent get "$HERDR_PANE_ID"                      # coordinator kind
-herdr pane split --current --direction right --cwd "$PWD" --no-focus   # down when the pane is tall; pane_id in .result.pane
+herdr pane split --current --direction right --cwd "$PWD" --no-focus   # down when the pane is tall; id in .result.pane.pane_id
 herdr pane rename <pane_id> dev
-herdr agent start dev --kind <kind> --pane <pane_id> -- <model-args>
+herdr agent start dev --kind <kind> --pane <pane_id> -- <model-args>   # agent name = label
 ```
 
-Model by role: `ui`, `test`, `review` take the cheapest tier. `dev` takes the cheapest tier too, one step up when the task touches state, concurrency, or data contracts. Model args after `--`: claude `--model <alias>`, codex `-m <model>`, grok `-m <model>`; other kinds, read `<kind> --help`. Take the current cheap model name from that help, not from memory. Agent name = label; names are unique among live agents, so a second `dev` is `dev-1`. Leave started panes open for the next task; close them only when the user asks.
+Model by role, as a tier: `ui` and `test` take cheap; `dev` takes mid, cheap only for a mechanical edit, top when the task touches state, concurrency, or data contracts; `review` takes top.
+
+| Kind   | Args after `--` | Cheap        | Mid           | Top                                            |
+| ------ | --------------- | ------------ | ------------- | ---------------------------------------------- |
+| claude | `--model <id>`  | `haiku`      | `sonnet`      | `opus`                                         |
+| codex  | `-m <id>`       | `gpt-6-luna` | `gpt-6.1-sol` | `gpt-6.1-sol -c model_reasoning_effort=medium` |
+| grok   | `-m <id>`       | `grok-4.5`   | `grok-4.6`    | `grok-4.7`                                     |
+
+Never start codex on `gpt-6-astra`, not even as a fallback; only when the user names it. A model the user names wins over the table. A table id the CLI rejects: list current ids (`~/.codex/models_cache.json`, `~/.grok/models_cache.json`), take the same tier, tell the user. Other kinds: read `<kind> --help` and ask once for the tiers. Agent name = label; names are unique among live agents, so a second `dev` is `dev-2`. Leave started panes open for the next task; close them only when the user asks.
 
 ## One task at a time
 
@@ -51,10 +59,10 @@ Task note: the file the user points at, or the repo's task folder (`docs/tasks/`
 
 Coordinator decides architecture, scope, contracts, and file ownership. One writer per file. Parallel prompts only when file sets do not overlap. Record a decision in the task note before any pane implements on top of it. A test that needs a production export: coordinator assigns that edit to the production owner, or transfers the file to `test` after the owner reports done.
 
-Write each prompt to a file in the scratchpad, then send it by absolute path:
+Write each prompt to a temp file outside the repo, then send its contents inline:
 
 ```bash
-herdr agent prompt <pane_id> "$(cat /abs/scratchpad/prompt-dev.md)" --wait --timeout 900000
+herdr agent prompt dev "$(cat /abs/tmp/prompt-dev.md)" --wait --timeout 900000
 ```
 
 `--wait` already gates on observed `working` and returns on the first settled `idle`, `done`, or `blocked`. Check the returned state. On `blocked`, stop and tell the user. On `agent_prompt_stalled` or `timeout`, run `herdr agent get` and `herdr agent read --source recent-unwrapped` before resending.
@@ -79,7 +87,7 @@ Commit only when the user asked. Stage only this task's files. Commit on the bra
 
 When the user says they will review the UI, skip visual verification and say so in the report.
 
-After integration, or when the task is explicitly stopped: copy delivery reports and open issues into the task note, then send each worker that ran its compact command and nothing else: `herdr agent prompt <pane_id> "/compact"` on Claude Code and Codex; check the kind in `herdr agent list` for others. Compact keeps a summary for the next task; use the clear command only when the user asks for a cold start.
+After integration, or when the task is explicitly stopped: copy delivery reports and open issues into the task note, then send each worker that ran its compact command and nothing else: `herdr agent prompt <role> "/compact" --wait --timeout 120000` on Claude Code and Codex; check the kind in `herdr agent list` for others. Compact keeps a summary for the next task; use the clear command only when the user asks for a cold start.
 
 ## Report
 
