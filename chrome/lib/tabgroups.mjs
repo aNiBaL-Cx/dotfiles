@@ -15,11 +15,15 @@
 // Usage:
 //   tabgroups.mjs list   --db <path> [--filter <s>] [--regex] [--all]
 //   tabgroups.mjs delete --db <path> --guid <g> [--guid <g>...]
+//   tabgroups.mjs update --db <path> --file <tsv>
 //
 // list   -> TSV on stdout: guid \t tabcount \t color \t title
 // delete -> TSV on stdout: groups \t tabs \t keys
+// update -> sets title and color of existing groups from a TSV file of
+//           guid \t color \t title lines; prints the number of groups changed
 // Exit: 0 ok · 1 error (message on stderr)
 
+import { readFileSync } from 'node:fs'
 import { ClassicLevel } from 'classic-level'
 
 const PREFIX = 'saved_tab_group-'
@@ -61,6 +65,62 @@ function varint (buf, i) {
     shift += 7
   }
   return [result, i]
+}
+
+// --- minimal protobuf writer -------------------------------------------------
+// update has to edit a record Chrome wrote without losing the fields this file
+// does not know about, so it works on raw entries rather than decoded values.
+
+function encVarint (n) {
+  const bytes = []
+  while (n > 127) { bytes.push((n & 0x7f) | 0x80); n = Math.floor(n / 128) }
+  bytes.push(n)
+  return Buffer.from(bytes)
+}
+
+const lenField = (field, body) =>
+  Buffer.concat([encVarint((field << 3) | 2), encVarint(body.length), body])
+const intField = (field, n) => Buffer.concat([encVarint(field << 3), encVarint(n)])
+
+// Split a message into its raw entries, order preserved.
+function entries (buf) {
+  const out = []
+  let i = 0
+  while (i < buf.length) {
+    const start = i
+    let tag
+    ;[tag, i] = varint(buf, i)
+    const type = tag & 7
+    let body = null
+    if (type === 0) {
+      ;[, i] = varint(buf, i)
+    } else if (type === 2) {
+      let len
+      ;[len, i] = varint(buf, i)
+      body = buf.subarray(i, i + len)
+      i += len
+    } else if (type === 5) {
+      i += 4
+    } else if (type === 1) {
+      i += 8
+    } else {
+      throw new Error(`unknown wire type ${type}`)
+    }
+    out.push({ field: tag >>> 3, raw: buf.subarray(start, i), body })
+  }
+  return out
+}
+
+// Rebuild buf with the length-delimited `field` run through fn(body).
+function editField (buf, field, fn) {
+  let hit = false
+  const out = entries(buf).map(e => {
+    if (e.field !== field || !e.body || hit) return e.raw
+    hit = true
+    return lenField(field, fn(e.body))
+  })
+  if (!hit) throw new Error(`no field ${field}`)
+  return Buffer.concat(out)
 }
 
 function walk (buf) {
@@ -185,11 +245,44 @@ async function remove (db, guids) {
   process.stdout.write(`${wanted.size}\t${tabCount}\t${ops.length}\n`)
 }
 
+async function update (db, file) {
+  const wanted = new Map()
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    if (!line) continue
+    const [guid, color, ...title] = line.split('\t')
+    const index = COLORS.indexOf(color)
+    if (!guid || index < 1) die(`bad line (guid, color, title expected): ${line}`)
+    wanted.set(guid, { index, title: title.join(' ') })
+  }
+
+  const ops = []
+  for (const guid of wanted.keys()) {
+    const value = await db.get(DT + guid, { valueEncoding: 'buffer' }).catch(() => null)
+    if (!value) die(`no such group: ${guid}`)
+    const { index, title } = wanted.get(guid)
+    const edited = editField(Buffer.from(value), F_SPECIFICS, specifics =>
+      editField(specifics, F_GROUP, group => Buffer.concat([
+        ...entries(group).filter(e => e.field !== F_GROUP_TITLE && e.field !== F_GROUP_COLOR).map(e => e.raw),
+        lenField(F_GROUP_TITLE, Buffer.from(title, 'utf8')),
+        intField(F_GROUP_COLOR, index)
+      ])))
+    ops.push({ type: 'put', key: DT + guid, value: edited })
+  }
+
+  // Only group records are rewritten, and only by their own -dt- key.
+  for (const op of ops) {
+    if (!op.key.startsWith(DT)) die(`refusing to write foreign key: ${op.key}`)
+  }
+
+  await db.batch(ops, { valueEncoding: 'buffer' })
+  process.stdout.write(`${ops.length}\n`)
+}
+
 // --- entry point -----------------------------------------------------------
 
 const argv = process.argv.slice(2)
 const command = argv.shift()
-const opts = { db: '', filter: '', regex: false, all: false }
+const opts = { db: '', filter: '', regex: false, all: false, file: '' }
 const guids = []
 
 while (argv.length) {
@@ -198,6 +291,7 @@ while (argv.length) {
     case '--db': opts.db = argv.shift() ?? die('--db expects a path'); break
     case '--filter': opts.filter = argv.shift() ?? die('--filter expects a value'); break
     case '--guid': guids.push(argv.shift() ?? die('--guid expects a value')); break
+    case '--file': opts.file = argv.shift() ?? die('--file expects a path'); break
     case '--regex': opts.regex = true; break
     case '--all': opts.all = true; break
     default: die(`unknown argument: ${arg}`)
@@ -223,6 +317,9 @@ try {
   } else if (command === 'delete') {
     if (!guids.length) die('delete needs at least one --guid')
     await remove(db, guids)
+  } else if (command === 'update') {
+    if (!opts.file) die('update needs --file')
+    await update(db, opts.file)
   } else {
     die(`unknown command: ${command ?? '(none)'}`)
   }
