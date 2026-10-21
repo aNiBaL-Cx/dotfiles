@@ -17,11 +17,11 @@ Two orchestrator panes, `ping` and `pong`, same agent kind and model. Supported 
 ## Invocation
 
 ```
-/pingpong <task source> [--base main] [--merge pr|ask|local]
+/pingpong <task source> [--base main] [--merge pr|ask|local] [--profile cheap|standard|premium]
 ```
 
 - Task source: a markdown file with `- [ ]` tasks, or a Linear/Jira query the project's tooling can read. Each task carries acceptance criteria. No criteria, write them into the task before starting it.
-- `--base` default `main`. `--merge` default `pr`.
+- `--base` default `main`. `--merge` default `pr`. `--profile` default `standard`; passed to every `dev-team` delegation.
 - Options persist in the handoff header. Never ask for them again mid-loop.
 
 ## Setup, first invocation only
@@ -39,7 +39,7 @@ ex="$(git rev-parse --git-common-dir)/info/exclude"; mkdir -p .handoff; grep -qx
 
 `agent start` returning `agent_not_ready`: read the pane, answer the startup dialog, wait idle, then `herdr agent rename <pane_id> pong`, because a blocked startup drops the name.
 
-Model args: the model you run on. `claude`: `--model <id from your system prompt>`. `codex`: `-m <model from ~/.codex/config.toml>`. Other kinds: flag from `<kind> --help`.
+Model args: `pong` runs at your level, with that level's row from the `dev-team` level table. Find your level by your model: claude, the id in your system prompt; codex, `gpt-6-astra` is staff, `gpt-6-luna` junior, `gpt-6.1-sol` senior unless the user said mid; grok, by model, 4.6 senior unless the user said mid. Other kinds: flag from `<kind> --help`. Workers this loop starts through `dev-team` take their level from the role and the loop's `--profile`.
 
 `herdr agent list` already shows `ping` and `pong` live: skip setup. Only one of them live: you are it; start the missing partner as above, rename included. You are the name `herdr agent list` shows for `$HERDR_PANE_ID`.
 
@@ -53,7 +53,7 @@ Then branch on the handoff file:
 
 1. **Pick** the first open task. Read its acceptance criteria. That is the whole scope.
 2. **Branch** `task/<slug>` from `--base`, fetched first. Slug: lowercase, hyphens, 4 words max. Worktree instead of branch when `git worktree list` already shows more than one entry or the task is tagged `[p]`.
-3. **Build**: plan, test first, implement, run the test and lint commands the repo's instructions file names. Single agent by default. Delegate with `cheap-dev-team` when the task splits across 3+ files by role; its `review` pane gives a second opinion on a diff that touches state, data contracts, or concurrency.
+3. **Build**: plan, test first, implement, run the test and lint commands the repo's instructions file names. Single agent by default. Delegate with `dev-team` when the task splits across 3+ files by role; its `review` pane gives a second opinion on a diff that touches state, data contracts, or concurrency.
 4. **Mark done** in the source before integrating. Markdown: flip `- [ ]` to `- [x]` on the task branch, same commit series. Linear/Jira: set the done status right after the merge. Under `ask`, the pane that resumes confirms the PR merged, marks done, then runs step 6 before picking the next task.
 5. **Integrate** per `--merge`:
    - `pr`: open PR against base, wait for CI with `gh pr checks --watch`. `no checks reported`: retry every 30s, 3 times; still none, the repo has no CI, treat as passed. Then merge the repo's way (squash unless the repo says otherwise), delete remote and local branch.
@@ -62,7 +62,7 @@ Then branch on the handoff file:
 6. **Clean up**: close every pane listed under `Workers` in the handoff with `herdr pane close <pane_id>`, whichever relay pane opened it, then set `Workers: none`. Remove the worktree, pull base.
 7. **Hand off**: rewrite `.handoff/pingpong.md`, pass to the partner (below), print one short report (task, merge sha or PR, partner prompted), end your turn.
 
-Adjacent tasks both tagged `[p]`: the active pane runs them together, one worktree and one `cheap-dev-team` `dev` worker each, integrates them in list order, one handoff after both. Any other case: one task at a time.
+Adjacent tasks both tagged `[p]`: the active pane runs them together, one worktree and one `dev-team` `dev` worker each, integrates them in list order, one handoff after both. Any other case: one task at a time.
 
 ## Handoff file
 
@@ -73,7 +73,7 @@ One file, `.handoff/pingpong.md`, whole rewrite every time, hard cap 40 lines. N
 
 **Updated:** YYYY-MM-DD HH:MM by ping|pong
 **Source:** docs/tasks.md | <linear/jira query>
-**Base:** main   **Merge:** pr
+**Base:** main   **Merge:** pr   **Profile:** standard
 **Branch:** task/<slug> | none   (worktree path if any; one line per branch for a `[p]` pair)
 **Progress:** 3/6 done
 **State:** running | complete | blocked: <one clause>
@@ -131,9 +131,9 @@ Every stop closes the `Workers` panes first, as in step 6. Their edits stay in t
 
 ## Rules
 
-- Invoking `/pingpong` is the permission to commit, push, and merge under `--merge`. Inside `cheap-dev-team`, that overrides its commit-only-when-asked rule; its "task note" is the task's markdown entry, or `.handoff/pingpong.md` for a Linear/Jira source; step 6 closes its worker panes, overriding its leave-open rule.
+- Invoking `/pingpong` is the permission to commit, push, and merge under `--merge`. Inside `dev-team`, that overrides its commit-only-when-asked rule; its "task note" is the task's markdown entry, or `.handoff/pingpong.md` for a Linear/Jira source; step 6 closes its worker panes, overriding its leave-open rule.
 
-- Agent name equals pane label, always both (`ping`, `pong`, and every `cheap-dev-team` worker). Target by name, never by sidebar position.
+- Agent name equals pane label, always both (`ping`, `pong`, and every `dev-team` worker). Target by name, never by sidebar position.
 - Commit only this task's files. Preserve unrelated dirty files.
 - Repo rules win where stricter: an instructions file (`CLAUDE.md`, `AGENTS.md`, rules dir) that requires human approval per merge turns `--merge pr` into `ask`.
 - Close only panes listed under `Workers`, never one the loop did not open. `ping` and `pong` stay open until the user closes them.
