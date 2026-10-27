@@ -1,6 +1,6 @@
 # Model levels
 
-Single source for the model args each agent level gets, per CLI kind. Used by `dev-team`, `multi-task` and `pingpong`. Each skill decides the level; this file turns a level into args. Rationale and costs: vault note `Resources/How-To/Tools/AI-Model-Levels.md`.
+Single source for everything that differs by agent CLI kind: the model args each level gets, and the session commands. The skills that use it stay vendor-neutral. Used by `dev-team`, `multi-task` and `pingpong`. Each skill decides the level; this file turns a level into args. Rationale and costs: vault note `Resources/How-To/Tools/AI-Model-Levels.md`.
 
 ## Main pick
 
@@ -32,6 +32,17 @@ Args after `--`, per level and kind:
 | junior | none                        | `-m gpt-5.6-luna`                               | none                          |
 
 Alternative also rejected: list current ids (`~/.codex/models_cache.json`, `~/.grok/models_cache.json`), take the same level, tell the user. Other kinds: read `<kind> --help` and ask once for the levels.
+
+## Session commands
+
+Prompts sent to an idle agent to shrink or drop its context:
+
+| Kind   | compact (keeps a summary) | reset (cold start) |
+| ------ | ------------------------- | ------------------ |
+| claude | `/compact`                | `/clear`           |
+| codex  | `/compact`                | `/new`             |
+
+Other kinds: find both in `<kind> --help` before relying on them; none exists, skip the compact and say so.
 
 ## Your own level
 

@@ -3,7 +3,8 @@ name: dev-team
 description: >
   Use when the user says dev-team, /dev-team, cheap-dev-team, /cheap-dev-team, "use the herdr panes", or asks
   to delegate a task across Herdr worker agents in the current workspace, open or not, at a cheap, standard or
-  premium profile. Requires HERDR_ENV=1.
+  premium profile. Requires HERDR_ENV=1. One task split across role panes; for a list of tasks use multi-task
+  (parallel, unmerged) or pingpong (sequential, merged).
 metadata:
   short-description: Delegate to Herdr worker panes at a cost profile
 ---
@@ -60,7 +61,7 @@ Level by role and profile:
 
 "State" means the task touches state, concurrency, or data contracts. Staff starts only under `premium` or when the user names it.
 
-Args after `--` for each level, the rules, and the alternatives: `references/model-levels.md` (next to this file). Read it before starting a pane.
+Args after `--` for each level, the rules, and the alternatives: `../references/model-levels.md`. Read it before starting a pane.
 
 Agent name = label; names are unique among live agents, so a second `dev` is `dev-2`. Leave started panes open for the next task; close them only when the user asks.
 
@@ -98,7 +99,7 @@ Commit only when the user asked. Stage only this task's files. Commit on the bra
 
 When the user says they will review the UI, skip visual verification and say so in the report.
 
-After integration, or when the task is explicitly stopped: copy delivery reports and open issues into the task note, then send each worker that ran its compact command and nothing else: `herdr agent prompt <role> "/compact" --wait --timeout 120000` on Claude Code and Codex; check the kind in `herdr agent list` for others. Compact keeps a summary for the next task; use the clear command only when the user asks for a cold start.
+After integration, or when the task is explicitly stopped: copy delivery reports and open issues into the task note, then send each worker that ran its kind's compact command (`../references/model-levels.md`, kind from `herdr agent list`) and nothing else: `herdr agent prompt <role> "<compact>" --wait --timeout 120000`. Compact keeps a summary for the next task; use the clear command only when the user asks for a cold start.
 
 ## Report
 

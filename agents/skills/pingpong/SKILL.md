@@ -3,66 +3,71 @@ name: pingpong
 description: >
   Use when the user says pingpong, /pingpong, "ping and pong", or asks two relay panes to work through a
   list of small, well-defined, sequential tasks unattended, handing off between panes so context stays
-  fresh. Requires HERDR_ENV=1 and a task source (markdown checklist, Linear, Jira).
+  fresh, merging each task before the next. Requires HERDR_ENV=1 and a task source (markdown checklist, Linear,
+  Jira). Not for parallel work or a dependency graph left unmerged: use multi-task.
 metadata:
   short-description: Two-pane relay loop over a task list
 ---
 
 # Pingpong
 
-Two orchestrator panes, `ping` and `pong`, same agent kind and model. Supported kinds: `claude` (reset `/clear`), `codex` (reset `/new`). Another kind: find its reset command in `<kind> --help` before setup, or stop. One is active and runs one task end to end. The other is standby. At task end the active pane writes the handoff, resets the standby, prompts it, and becomes standby itself. The loop ends when the task source has no open task.
+Two orchestrator panes, `ping` and `pong`, same agent kind and model. The kind's reset command comes from `../references/model-levels.md` (Session commands). A kind with no reset command: stop before setup. One is active and runs one task end to end. The other is standby. At task end the active pane writes the handoff, resets the standby, prompts it, and becomes standby itself. The loop ends when the task source has no open task.
 
 **REQUIRED BACKGROUND:** `herdr --skill` (pane and agent commands, states, prompt gating). Not repeated here.
 
 ## Invocation
 
 ```
-/pingpong <task source> [--base main] [--merge pr|ask|local] [--profile cheap|standard|premium]
+/pingpong <task source> [--merge pr|ask|local] [--profile cheap|standard|premium]
 ```
 
 - Task source: a markdown file with `- [ ]` tasks, or a Linear/Jira query the project's tooling can read. Each task carries acceptance criteria. No criteria, write them into the task before starting it.
-- `--base` default `main`. `--merge` default `pr`. `--profile` default `standard`; passed to every `dev-team` delegation.
+- `--merge` default `pr`. `--profile` default `standard`; passed to every `dev-team` delegation.
+- `<base>` is the remote's default branch: `git fetch origin`, then `git symbolic-ref --short refs/remotes/origin/HEAD`. Fetch fails: stop and ask.
 - Options persist in the handoff header. Never ask for them again mid-loop.
 
 ## Setup, first invocation only
 
 ```bash
 test "${HERDR_ENV:-}" = 1 || { echo "not inside Herdr"; exit 1; }
+[ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ] || { echo "run from the main checkout"; exit 1; }
+git symbolic-ref --short HEAD                           # must equal <base>, else stop
 herdr agent rename "$HERDR_PANE_ID" ping                # agent name is the prompt/wait target; pane label is cosmetic
 herdr pane rename "$HERDR_PANE_ID" ping
 herdr agent get "$HERDR_PANE_ID"                        # kind only; no model field
 herdr pane split --current --direction right --cwd "$PWD" --no-focus   # new id in .result.pane.pane_id
 herdr pane rename <pane_id> pong
 herdr agent start pong --kind <kind> --pane <pane_id> -- <model args>
-ex="$(git rev-parse --git-common-dir)/info/exclude"; mkdir -p .handoff; grep -qx '.handoff/' "$ex" || echo '.handoff/' >> "$ex"
+ex="$(git rev-parse --git-common-dir)/info/exclude"; mkdir -p .handoff
+for p in .handoff/ .worktrees/ .evidence/; do grep -qx "$p" "$ex" || echo "$p" >> "$ex"; done
 ```
 
 `agent start` returning `agent_not_ready`: read the pane, answer the startup dialog, wait idle, then `herdr agent rename <pane_id> pong`, because a blocked startup drops the name.
 
-Model args: `pong` runs at your level. Find your level and its args in `../dev-team/references/model-levels.md` (sections "Your own level" and "Main pick"). Workers this loop starts through `dev-team` take their level from the role and the loop's `--profile`.
+Model args: `pong` runs at your level. Find your level and its args in `../references/model-levels.md` (sections "Your own level" and "Main pick"). Workers this loop starts through `dev-team` take their level from the role and the loop's `--profile`.
 
 `herdr agent list` already shows `ping` and `pong` live: skip setup. Only one of them live: you are it; start the missing partner as above, rename included. You are the name `herdr agent list` shows for `$HERDR_PANE_ID`.
 
 Then branch on the handoff file:
 
 - `.handoff/pingpong.md` exists: read it and continue from `Next`.
-- It does not exist: this is the first run, and that is expected, not an error. Take source, `--base` and `--merge` from the invocation arguments. Write the handoff (format below) with `State: running`, `Progress: 0/<open tasks>`, `Branch: none`, `Last task: none`, and `Next` set to the first open task. Then run the first task cycle yourself. Do not prompt the partner first; it stays idle until step 7.
+- It does not exist: this is the first run, and that is expected, not an error. Take source, `--merge` and `--profile` from the invocation arguments, `<base>` from the remote. Write the handoff (format below) with `State: running`, `Progress: 0/<open tasks>`, `Branch: none`, `Last task: none`, and `Next` set to the first open task. Then run the first task cycle yourself. Do not prompt the partner first; it stays idle until step 7.
 - It does not exist and the invocation has no task source: stop and ask for one.
 
 ## One task cycle, active pane
 
 1. **Pick** the first open task. Read its acceptance criteria. That is the whole scope.
-2. **Branch** `task/<slug>` from `--base`, fetched first. Slug: lowercase, hyphens, 4 words max. Worktree instead of branch when `git worktree list` already shows more than one entry or the task is tagged `[p]`.
-3. **Build**: plan, test first, implement, run the test and lint commands the repo's instructions file names. Single agent by default. Delegate with `dev-team` when the task splits across 3+ files by role; its `review` pane gives a second opinion on a diff that touches state, data contracts, or concurrency.
+2. **Worktree**: `git fetch origin`, then a worktree on branch `task/<slug>` from `origin/<base>`. Slug: the task's tracker ID lowercased (`sq2-2183`) when it has one, else lowercase hyphenated words, 4 max. Use the project's worktree command when its instructions name one and it accepts a start point; otherwise `git worktree add <repo root>/.worktrees/<slug> -b task/<slug> origin/<base>`. The main checkout stays on `<base>`.
+3. **Build**: in the worktree, apply the `implement-task` skill (`../implement-task/SKILL.md`) to the task, with these overrides: this loop owns status and integration, so implement-task commits on `task/<slug>`, does not update the source or tracker, and does not push. Single agent by default. Inside implement-task, split the implementation with `dev-team` when the task spans 3+ files by role; its `review` pane then replaces implement-task's reviewer subagent. Not validated (state pending or blocked): stop as below, do not integrate.
 4. **Mark done** in the source before integrating. Markdown: flip `- [ ]` to `- [x]` on the task branch, same commit series. Linear/Jira: set the done status right after the merge. Under `ask`, the pane that resumes confirms the PR merged, marks done, then runs step 6 before picking the next task.
 5. **Integrate** per `--merge`:
-   - `pr`: open PR against base, wait for CI with `gh pr checks --watch`. `no checks reported`: retry every 30s, 3 times; still none, the repo has no CI, treat as passed. Then merge the repo's way (squash unless the repo says otherwise), delete remote and local branch.
-   - `ask`: open PR, write its link in the handoff, stop with `State: blocked`. Do not merge. Unattended then means one task per run; the user merges and prompts `continue the pingpong loop`.
-   - `local`: merge into base, push if base tracks a remote.
-6. **Clean up**: close every pane listed under `Workers` in the handoff with `herdr pane close <pane_id>`, whichever relay pane opened it, then set `Workers: none`. Remove the worktree, pull base.
+   - `pr`: open PR against base, with implement-task's evidence per criterion (criterion, proof, result) in the body, because the evidence directory goes with the worktree. Wait for CI with `gh pr checks --watch`. `no checks reported`: retry every 30s, 3 times; still none, the repo has no CI, treat as passed. Then merge the repo's way (squash unless the repo says otherwise), delete remote and local branch.
+   - `ask`: open PR with the same evidence body, write its link in the handoff, stop with `State: blocked`. Do not merge. Unattended then means one task per run; the user merges and prompts `continue the pingpong loop`.
+   - `local`: merge into base in the main checkout, push if base tracks a remote. Keep the evidence summary in the handoff's `Last task`.
+6. **Clean up**: close every pane listed under `Workers` in the handoff with `herdr pane close <pane_id>`, whichever relay pane opened it, then set `Workers: none`. Remove the worktree, pull base in the main checkout.
 7. **Hand off**: rewrite `.handoff/pingpong.md`, pass to the partner (below), print one short report (task, merge sha or PR, partner prompted), end your turn.
 
-Adjacent tasks both tagged `[p]`: the active pane runs them together, one worktree and one `dev-team` `dev` worker each, integrates them in list order, one handoff after both. Any other case: one task at a time.
+One task at a time. Parallel tasks belong to `multi-task`.
 
 ## Handoff file
 
@@ -73,8 +78,8 @@ One file, `.handoff/pingpong.md`, whole rewrite every time, hard cap 40 lines. N
 
 **Updated:** YYYY-MM-DD HH:MM by ping|pong
 **Source:** docs/tasks.md | <linear/jira query>
-**Base:** main   **Merge:** pr   **Profile:** standard
-**Branch:** task/<slug> | none   (worktree path if any; one line per branch for a `[p]` pair)
+**Base:** master   **Merge:** pr   **Profile:** standard
+**Branch:** task/<slug> | none   (and its worktree path)
 **Progress:** 3/6 done
 **State:** running | complete | blocked: <one clause>
 **Partner context:** cleared | kept: <why it still matters>
@@ -97,7 +102,7 @@ One file, `.handoff/pingpong.md`, whole rewrite every time, hard cap 40 lines. N
 ## Pass to partner
 
 ```bash
-herdr agent prompt <partner> "/clear"          # /new on codex
+herdr agent prompt <partner> "<reset>"        # the kind's reset command
 herdr agent wait <partner> --timeout 30000
 herdr agent prompt <partner> "Read .handoff/pingpong.md and continue the pingpong loop."
 ```
@@ -131,7 +136,7 @@ Every stop closes the `Workers` panes first, as in step 6. Their edits stay in t
 
 ## Rules
 
-- Invoking `/pingpong` is the permission to commit, push, and merge under `--merge`. Inside `dev-team`, that overrides its commit-only-when-asked rule; its "task note" is the task's markdown entry, or `.handoff/pingpong.md` for a Linear/Jira source; step 6 closes its worker panes, overriding its leave-open rule.
+- Invoking `/pingpong` is the permission to commit, push, and merge under `--merge`. The loop pushes and merges; implement-task only commits. Inside `dev-team`, that overrides its commit-only-when-asked rule; its "task note" is the task's markdown entry, or `.handoff/pingpong.md` for a Linear/Jira source; step 6 closes its worker panes, overriding its leave-open rule.
 
 - Agent name equals pane label, always both (`ping`, `pong`, and every `dev-team` worker). Target by name, never by sidebar position.
 - Commit only this task's files. Preserve unrelated dirty files.

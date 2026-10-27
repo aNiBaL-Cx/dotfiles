@@ -1,6 +1,6 @@
 ---
 name: implement-task
-description: "Implement one development task end to end with minimal human input: read the task, implement, test, validate, collect evidence per acceptance criterion, and update status only as the project's workflow permits. Tracker-agnostic (markdown file, issue tracker, pasted text). Use when: implement task, implement this ticket, do this task autonomously, /implement-task."
+description: "Implement one development task end to end with minimal human input: read the task, implement, test, validate, collect evidence per acceptance criterion, and update status only as the project's workflow permits. Tracker-agnostic (markdown file, issue tracker, pasted text). Use when: implement task, implement this ticket, do this task autonomously, /implement-task. Not for a list of tasks: use multi-task (parallel, dependency-aware, branches left unmerged) or pingpong (sequential, each task merged)."
 metadata:
   short-description: Autonomous single-task implementation with evidence-gated completion
 ---
@@ -151,7 +151,11 @@ Otherwise use:
 <repo-root>/.evidence/<task-slug>/
 ```
 
-Do not commit the directory by default. If `.evidence/` is not Git-ignored, report it rather than editing `.gitignore`.
+Do not commit the directory by default. Keep it out of Git locally, never through `.gitignore`:
+
+```bash
+ex="$(git rev-parse --git-common-dir)/info/exclude"; grep -qx '.evidence/' "$ex" || echo '.evidence/' >> "$ex"
+```
 
 A criterion without sufficient proof remains open.
 
