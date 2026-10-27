@@ -17,7 +17,7 @@ A transfer note: read once, by one reader, soon, then dead. It holds the state n
 ## One file, overwritten
 
 - Path: `<repo root>/.handoff/<slug>.md`. Repo root is `git rev-parse --show-toplevel` (a worktree's own root, not the main checkout).
-- Slug: the ticket ID when the branch or task has one (`SQ2-1927.md`), else a short kebab-case name for the work.
+- Slug: the ticket ID when the branch or task has one (`TASK-1927.md`), else a short kebab-case name for the work.
 - Create `.handoff/` if missing. Do not commit it; if it is not ignored, say so instead of editing `.gitignore`.
 - Rewrite the whole file. No timestamped names, no `-2`, no "since last handoff" section.
 - Read the current file first. Keep only what is still "now".
