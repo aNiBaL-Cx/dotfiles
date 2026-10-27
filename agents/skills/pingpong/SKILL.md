@@ -39,7 +39,7 @@ ex="$(git rev-parse --git-common-dir)/info/exclude"; mkdir -p .handoff; grep -qx
 
 `agent start` returning `agent_not_ready`: read the pane, answer the startup dialog, wait idle, then `herdr agent rename <pane_id> pong`, because a blocked startup drops the name.
 
-Model args: `pong` runs at your level, with that level's row from the `dev-team` level table. Find your level by your model: claude, the id in your system prompt; codex, `gpt-6-astra` is staff, `gpt-6-luna` junior, `gpt-6.1-sol` senior unless the user said mid; grok, by model, 4.6 senior unless the user said mid. Other kinds: flag from `<kind> --help`. Workers this loop starts through `dev-team` take their level from the role and the loop's `--profile`.
+Model args: `pong` runs at your level. Find your level and its args in `../dev-team/references/model-levels.md` (sections "Your own level" and "Main pick"). Workers this loop starts through `dev-team` take their level from the role and the loop's `--profile`.
 
 `herdr agent list` already shows `ping` and `pong` live: skip setup. Only one of them live: you are it; start the missing partner as above, rename included. You are the name `herdr agent list` shows for `$HERDR_PANE_ID`.
 
