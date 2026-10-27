@@ -101,7 +101,7 @@ When the tracker says done:
 
 1. Run the vault's close-out process first, if the vault's agent instructions name one. Nothing in the index is rewritten or trimmed at archive time; it is the record as it stands.
 2. Delete `<ID>-handoff.md` and `test_results/` if still there.
-3. Move the folder to `<archive>/<YYYY>/`. Move it in Obsidian so links update.
+3. Move the folder to `<archive>`, at the path the vault's README or agent instructions give (default: same path as under `<tasks>`). Move it in Obsidian so links update.
 
 ### Link in the daily note
 
