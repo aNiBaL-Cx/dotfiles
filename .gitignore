@@ -4,3 +4,7 @@
 
 # Installed by install.sh; the lockfile is what's tracked.
 chrome/node_modules/
+
+# macOS and Python caches.
+.DS_Store
+__pycache__/
