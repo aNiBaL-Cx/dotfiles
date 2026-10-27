@@ -70,3 +70,5 @@ alias gl4s='git --no-pager log --oneline -10 --format="%s" --reverse'
 
 # Codex
 alias codexa='codex --sandbox workspace-write --ask-for-approval never'
+# codex auto is equivalent to codex --dangerously-bypass-approvals-and-sandbox
+alias codex-auto='codex --yolo'
