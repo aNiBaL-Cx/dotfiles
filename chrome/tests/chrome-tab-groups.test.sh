@@ -65,8 +65,8 @@ echo "-- usage errors"
 DB=$(fresh)
 check "unknown option"        1 "$(run "$DB" --frobnicate)"
 check "delete without filter" 1 "$(run "$DB" --delete)"
-check "two filters"           1 "$(run "$DB" SQ2 NEXT)"
-check "--all with filter"     1 "$(run "$DB" --all SQ2 --delete)"
+check "two filters"           1 "$(run "$DB" TASK NEXT)"
+check "--all with filter"     1 "$(run "$DB" --all TASK --delete)"
 check "--profile empty"       1 "$("$CLI" --profile >/dev/null 2>&1; echo $?)"
 check "missing db"            1 "$(run "$TMP/nonexistent-db")"
 
@@ -76,9 +76,9 @@ chrome_down() { printf '#!/bin/sh\nexit 1\n' > "$TMP/bin/pgrep"; }
 
 chrome_up
 check "listing still works"   0 "$(run "$DB")"
-check "delete blocked"        2 "$(run "$DB" SQ2 --delete)"
-check "restart needs delete"  1 "$(run "$DB" SQ2 --restart)"
-check "no tty, no --yes"      1 "$(run "$DB" SQ2 --delete --restart </dev/null)"
+check "delete blocked"        2 "$(run "$DB" TASK --delete)"
+check "restart needs delete"  1 "$(run "$DB" TASK --restart)"
+check "no tty, no --yes"      1 "$(run "$DB" TASK --delete --restart </dev/null)"
 chrome_down
 
 echo "-- --restart quits, deletes, relaunches"
@@ -93,10 +93,10 @@ printf '#!/bin/sh\ntouch %s/quit\necho "$@" >> %s/osascript.log\n' "$TMP" "$TMP"
 printf '#!/bin/sh\necho "$@" >> %s/open.log\n' "$TMP" > "$TMP/bin/open"
 chmod +x "$TMP/bin/pgrep" "$TMP/bin/osascript" "$TMP/bin/open"
 
-check "restart deletes"       0 "$(run "$DB" SQ2-13 --delete --restart --yes)"
+check "restart deletes"       0 "$(run "$DB" TASK-13 --delete --restart --yes)"
 check "asked chrome to quit"  0 "$(grep -q 'quit app' "$TMP/osascript.log"; echo $?)"
 check "relaunched chrome"     0 "$(grep -q 'Google Chrome' "$TMP/open.log"; echo $?)"
-check "group is gone"         "NEXT,Reviews,SQ2-1095" "$(titles "$DB")"
+check "group is gone"         "NEXT,Reviews,TASK-1095" "$(titles "$DB")"
 
 rm -f "$TMP/quit" "$TMP/bin/osascript" "$TMP/bin/open"
 chrome_down
@@ -105,27 +105,27 @@ echo "-- listing"
 DB=$(fresh)
 check "lists all"             0 "$(run "$DB")"
 check "no match exits 3"      3 "$(run "$DB" zzzznope)"
-check "all four groups"       "NEXT,Reviews,SQ2-1095,rake SQ2-1365" "$(titles "$DB")"
+check "all four groups"       "NEXT,Reviews,TASK-1095,rake TASK-1365" "$(titles "$DB")"
 
 echo "-- dry run changes nothing"
 before=$(keys "$DB")
-run "$DB" SQ2 >/dev/null
+run "$DB" TASK >/dev/null
 check "key count unchanged"   "$before" "$(keys "$DB")"
 
 echo "-- substring vs regex"
 DB=$(fresh)
-check "substring SQ2"         2 "$("$CLI" --db "$DB" SQ2 -q 2>/dev/null | wc -l | tr -d ' ')"
-check "substring case-insens" 2 "$("$CLI" --db "$DB" sq2 -q 2>/dev/null | wc -l | tr -d ' ')"
-check "regex anchored"        1 "$("$CLI" --db "$DB" --regex '^SQ2' -q 2>/dev/null | wc -l | tr -d ' ')"
+check "substring TASK"         2 "$("$CLI" --db "$DB" TASK -q 2>/dev/null | wc -l | tr -d ' ')"
+check "substring case-insens" 2 "$("$CLI" --db "$DB" task -q 2>/dev/null | wc -l | tr -d ' ')"
+check "regex anchored"        1 "$("$CLI" --db "$DB" --regex '^TASK' -q 2>/dev/null | wc -l | tr -d ' ')"
 check "regex alternation"     2 "$("$CLI" --db "$DB" --regex 'NEXT|Reviews' -q 2>/dev/null | wc -l | tr -d ' ')"
 check "bad regex errors"      1 "$(run "$DB" --regex '[')"
 
 echo "-- delete removes the group and its tabs"
 DB=$(fresh)
-check "delete succeeds"       0 "$(run "$DB" SQ2-13 --delete)"
-check "3 groups left"         "NEXT,Reviews,SQ2-1095" "$(titles "$DB")"
+check "delete succeeds"       0 "$(run "$DB" TASK-13 --delete)"
+check "3 groups left"         "NEXT,Reviews,TASK-1095" "$(titles "$DB")"
 # Fixture holds 16 saved_tab_group keys: 4 group dt + 3 group md (NEXT has
-# none) + 4 tab dt + 4 tab md + GlobalMetadata. Deleting rake SQ2-1365 takes
+# none) + 4 tab dt + 4 tab md + GlobalMetadata. Deleting rake TASK-1365 takes
 # its own pair plus a pair for each of its 2 tabs = 6.
 check "tab records gone"      10 "$(keys "$DB" saved_tab_group-)"
 
@@ -145,14 +145,14 @@ check "everything deleted"    3 "$(run "$DB")"
 backup=$(ls -d "$DB".backup-* 2>/dev/null | head -1)
 check "backup exists"         0 "$([ -d "$backup" ]; echo $?)"
 rm -rf "$DB" && mv "$backup" "$DB"
-check "restored"              "NEXT,Reviews,SQ2-1095,rake SQ2-1365" "$(titles "$DB")"
+check "restored"              "NEXT,Reviews,TASK-1095,rake TASK-1365" "$(titles "$DB")"
 
 echo "-- --apply rewrites title and color only"
 DB=$(fresh)
-printf 'g0000002-0000-0000-0000-000000000002\torange\t🟧 ⏫ SQ2-1095\n' > "$TMP/apply.tsv"
+printf 'g0000002-0000-0000-0000-000000000002\torange\t🟧 ⏫ TASK-1095\n' > "$TMP/apply.tsv"
 before=$(keys "$DB")
 check "apply succeeds"        0 "$("$CLI" --db "$DB" --apply "$TMP/apply.tsv" >/dev/null 2>&1; echo $?)"
-check "title changed"         "NEXT,Reviews,rake SQ2-1365,🟧 ⏫ SQ2-1095" "$(titles "$DB")"
+check "title changed"         "NEXT,Reviews,rake TASK-1365,🟧 ⏫ TASK-1095" "$(titles "$DB")"
 check "color changed"         "orange" "$("$CLI" --db "$DB" --tsv 2>/dev/null | awk -F'\t' '$4 ~ /1095/ {print $3}')"
 check "other color kept"      "purple" "$("$CLI" --db "$DB" --tsv 2>/dev/null | awk -F'\t' '$4 ~ /rake/ {print $3}')"
 check "tab count kept"        1 "$("$CLI" --db "$DB" --tsv 2>/dev/null | awk -F'\t' '$4 ~ /1095/ {print $2}')"

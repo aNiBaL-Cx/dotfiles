@@ -9,7 +9,7 @@
 #
 # One `docker ps -a` call, ~80ms. Deliberately does NOT call `colima status`
 # (~540ms every refresh): a failed docker call already means the VM is down.
-# Counts every container on the machine, not just fullfabric's.
+# Counts every container on the machine, not just one project's.
 
 set -u
 

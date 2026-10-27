@@ -36,8 +36,8 @@
 #   -q, --quiet         suppress the summary line
 #   -h, --help          this text
 #
-# Matching is case-insensitive substring on the group title: `SQ2-13` hits
-# every group containing it — "rake SQ2-1365", "SQ2-1317", "Panda SQ2-1367".
+# Matching is case-insensitive substring on the group title: `TASK-13` hits
+# every group containing it — "rake TASK-1365", "TASK-1317", "Panda TASK-1367".
 # Always look at the dry-run list before adding --delete.
 #
 # --restart quits Chrome cleanly, but your open tabs only come back if the

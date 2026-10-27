@@ -47,7 +47,7 @@ for p in .worktrees/ .handoff/; do grep -qx "$p" "$ex" || echo "$p" >> "$ex"; do
 2. Give the run an ID, `<run>`: today's date, `YYYY-MM-DD`. A state file, branch or worktree already uses that date: append `-2`, `-3`, and so on.
 3. Give every task an ID, `TASK-NNN`: three digits from `TASK-001`, in source order, whatever the source. IDs belong to this run only; they are never written to the source and never reused within the run.
 4. Keep each task's source reference beside its ID, so the report maps back to where the task lives:
-   - tracker issue: its key (`SQ2-2183`, `PROJ-12`, `#123`);
+   - tracker issue: its key (`TASK-2183`, `PROJ-12`, `#123`);
    - Markdown checklist: `<file>:<line>` of the item;
    - pasted text: `pasted:<position>`.
 5. Names derived from the ID, used everywhere below:
@@ -55,7 +55,7 @@ for p in .worktrees/ .handoff/; do grep -qx "$p" "$ex" || echo "$p" >> "$ex"; do
    - `<branch>`: `task/<run>/<slug>`, e.g. `task/2026-10-27/task-001`.
    - `<wt>`: `<repo root>/.worktrees/<run>/<slug>`.
 6. Edges, two kinds, written with task IDs:
-   - **depends on**: explicit markers in the task (`depends on`, `after`, `blocked by`, `needs`) or tracker relations. Translate a marker that names a source reference (`after SQ2-2183`) into the task ID that carries it. A marker naming something outside the list is not an edge; record it under `Blocked` as `external: <reference>`. The dependent branches from the dependency's commit and waits for it to be `implemented`.
+   - **depends on**: explicit markers in the task (`depends on`, `after`, `blocked by`, `needs`) or tracker relations. Translate a marker that names a source reference (`after TASK-2183`) into the task ID that carries it. A marker naming something outside the list is not an edge; record it under `Blocked` as `external: <reference>`. The dependent branches from the dependency's commit and waits for it to be `implemented`.
    - **conflicts with**: two tasks whose criteria name the same files. Not a dependency. They do not run at the same time. The later one starts when the earlier one has finished in any state: from the earlier task's branch when that is `implemented`, so the user does not inherit a certain merge conflict, else from `<base>`. Starting from the earlier branch carries its commits, so the edge then becomes `depends on <earlier ID>` in the state file: a later block of the earlier task propagates, and `Merge order` puts it first.
    - Criteria rarely name files, so most real conflicts are missed here. The end-of-run check (Stops) catches them.
    - Nothing else is inferred. Same feature, same area, list order: no edge.
@@ -177,7 +177,7 @@ Herdr: after recording a delivery, send that worker its kind's compact command f
 ## Tasks
 | id | source | title | depends on | conflicts with | state | start | sha | agent/pane | evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| TASK-001 | SQ2-2183 | Parental HE for CUKAS | none | none | implemented (human pending) | origin/master | abc123 | task-001 / p12 | .worktrees/2026-10-27/task-001/.evidence/task-001 |
+| TASK-001 | TASK-2183 | Parental HE for CUKAS | none | none | implemented (human pending) | origin/master | abc123 | task-001 / p12 | .worktrees/2026-10-27/task-001/.evidence/task-001 |
 | TASK-002 | docs/tasks.md:14 | Export button | TASK-001 | none | running | abc123 | | task-002 / p13 | |
 | TASK-003 | pasted:3 | Fix footer copy | none | TASK-001 | pending | | | | |
 

@@ -101,7 +101,7 @@ _wt_filter() {
 #   wt                     # selector over everything
 #   wt 1400                # matches path or branch
 #   wt 1397 marionette     # narrow by repo
-#   wt feat/SQ2            # matches the branch side
+#   wt feat/TASK           # matches the branch side
 #
 #   wt -l [words]          # --list: print matching worktrees, no selector
 #   wt -d [words]          # --delete: selector (TAB to multi-select), then
@@ -158,7 +158,7 @@ wt() {
 # Same matching as `wt` (path + branch, words ANDed, case-insensitive), but
 # every match opens instead of one being picked: a ticket that spans backend and
 # two frontends lands in a single multi-root window.
-#   wtedit SQ2-1095        # every repo's SQ2-1095 worktree
+#   wtedit TASK-1095        # every repo's TASK-1095 worktree
 #   wtedit 1397 react      # narrow by repo
 #   wtedit                 # selector, TAB to multi-select
 #

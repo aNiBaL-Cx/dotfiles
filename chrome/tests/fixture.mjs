@@ -41,8 +41,8 @@ const tabRecord = (guid, parent, url, title) =>
 // --- fixture data ----------------------------------------------------------
 
 const GROUPS = [
-  { guid: 'g0000001-0000-0000-0000-000000000001', title: 'rake SQ2-1365', color: 7 },
-  { guid: 'g0000002-0000-0000-0000-000000000002', title: 'SQ2-1095', color: 1 },
+  { guid: 'g0000001-0000-0000-0000-000000000001', title: 'rake TASK-1365', color: 7 },
+  { guid: 'g0000002-0000-0000-0000-000000000002', title: 'TASK-1095', color: 1 },
   { guid: 'g0000003-0000-0000-0000-000000000003', title: 'NEXT', color: 4 },
   { guid: 'g0000004-0000-0000-0000-000000000004', title: 'Reviews', color: 1 }
 ]
