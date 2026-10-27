@@ -114,6 +114,15 @@ those are symlinked in from elsewhere. Skills that are not tied to one vault liv
 in `agents/skills/`; each is linked per-dir into both `~/.claude/skills/` and
 `~/.agents/skills/` (Codex/Copilot/Gemini read the latter).
 
+Third-party skills are not copied here; install them from their own repos, which
+also keeps them updatable (`npx skills update -g`):
+
+```bash
+# Obsidian syntax for agents: wikilinks, callouts, properties, Bases, Canvas
+npx skills add https://github.com/kepano/obsidian-skills -g -y \
+  -s obsidian-markdown -s obsidian-bases -s json-canvas
+```
+
 ## Tests
 
 Scripts under `tmux/scripts/` are testable headless via env-var overrides
