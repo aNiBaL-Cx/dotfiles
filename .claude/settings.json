@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "rm -f \"/tmp/claude-statusline-${TMUX_PANE:-__none__}\" \"/tmp/agent-state-${TMUX_PANE:-__none__}\""
+            "command": "rm -f \"/tmp/agent-statusline-${TMUX_PANE:-__none__}\" \"/tmp/agent-state-${TMUX_PANE:-__none__}\""
           }
         ]
       }

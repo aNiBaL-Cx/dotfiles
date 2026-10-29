@@ -59,20 +59,27 @@ profile's sync LevelDB alongside preferences, sessions and passkeys, so every
 delete backs the store up first and only ever touches `saved_tab_group` keys.
 Groups re-sync unless tab group sync is off. `--help` for the rest.
 
-**Claude Code integration (optional).** The status bar shows the active pane's
-Claude statusline — model, a 10-slot context bar, and rate-limit usage when the
-API reports it (`Opus 5 [██████░░░░] 62% · 5h:19% · 7d:65%`); window tabs turn
+**Claude Code integration (optional).** The sidebar and agent TUI show each
+pane's agent statusline — model, a 10-slot context bar, and rate-limit usage when
+the API reports it (`Opus 5 [██████░░░░] 62% · 5h:19% · 7d:65%`); window tabs turn
 red when an agent finishes while you're not looking; and a notification (macOS
 banner, plus ntfy/Pushover when configured) reaches you outside tmux. Fed by
 Claude Code hooks (statusLine command + Stop/Notification hooks writing
-`/tmp/claude-statusline-<pane>`, `/tmp/agent-state-<pane>`,
+`/tmp/agent-statusline-<pane>`, `/tmp/agent-state-<pane>`,
 `~/.claude/pane-sessions/`, and window-format overrides) — without them the
 segments simply stay empty and `claude-resurrect` falls back to `--continue`.
 
-`statusline-command.sh` picks its output channel from `$TMUX_PANE`: under tmux
-it writes the pane file only, so the string isn't shown twice; anywhere else
-(Orca's PTYs, a plain terminal) it prints to stdout and Claude Code renders the
-status line itself.
+`statusline-command.sh` always prints, so Claude Code renders the line in its
+own footer (focused or not, tmux or not); under tmux it also writes the pane file.
+
+Codex has no statusLine hook, so `.codex/statusline-command.sh` runs on Codex's
+`Stop` and `PostToolUse` hooks instead. It reads the latest `turn_context` and
+`token_count` events from the session rollout (`transcript_path`), reshapes them
+into Claude's statusLine JSON and pipes that through the Claude script, so both
+agents write the same `/tmp/agent-statusline-<pane>` line. `install.sh` merges the
+two hook entries into `~/.codex/hooks.json` (shared with herdr and caveman).
+
+**Menu bar: Linear work (optional).** `swiftbar/linear-work.2m.sh` is a [SwiftBar](https://github.com/swiftbar/SwiftBar) plugin. The bar shows `◆ <in-progress tickets> · 💬<unread> · 🤖<working agents>`. The dropdown lists your started Linear issues by priority with state, linked PRs (review decision, CI rollup, unread GitHub notification) and the herdr agents whose session, workspace/tab label, cwd or title contains the ticket ID (or its bare number, as `tabs-sync` names tabs); clicks open Linear/GitHub or focus the agent. Only the `default` herdr session by default; tick others in the "herdr sessions" submenu (saved in `~/.config/swiftbar/linear-work-sessions`). A "Legend" submenu explains every icon and color. Point SwiftBar's plugin folder at `swiftbar/` and put a Linear personal API key in `~/.linear_api_token` (`chmod 600`, shared with `lineark`).
 
 ## Install
 
@@ -84,7 +91,7 @@ git clone https://github.com/aNiBaL-Cx/dotfiles ~/projects/dotfiles
 Symlinks `tmux/tmux.conf` → `~/.tmux.conf`, each script into
 `~/.config/tmux/scripts/` (per-file, so local-only scripts can coexist),
 `.claude/hooks/*` + `.claude/statusline-command.sh` + `.claude/CLAUDE.md` into
-`~/.claude/`,
+`~/.claude/`, `.codex/statusline-command.sh` into `~/.codex/`,
 `nvim/` → `~/.config/nvim` (whole dir; an existing real directory is skipped —
 move it aside first), `zsh/*` → `~/.zshrc`, `~/.zprofile`, `~/.zshenv`,
 `~/.aliases`, `chrome/chrome-tab-groups` → `~/.local/bin/`,

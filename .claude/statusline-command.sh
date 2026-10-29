@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Claude Code statusLine hook (settings.json -> statusLine.command).
-# Writes a compact status string to a per-pane temp file that the tmux
-# status bar displays for the active pane (see status-right in ~/.tmux.conf).
-# Prints to stdout only when not running under tmux, so Claude Code renders
-# it natively there without duplicating the tmux status bar.
+# Prints a compact status string for Claude Code's footer, and under tmux also
+# writes it to a per-pane temp file for the tmux status bar, sidebar and agent
+# TUI. Always printed, so an unfocused Claude pane still shows its own line.
 input=$(cat)
 
 model=$(echo "$input" | jq -r '.model.display_name // ""')
@@ -26,8 +25,5 @@ output="$short_model [$bar] ${ctx}%"
 [ -n "$usage_7d" ] && output="$output · 7d:${usage_7d}%"
 [ -n "$agent" ] && output="$output · $agent"
 
-if [ -n "$TMUX_PANE" ]; then
-  printf '%s\n' "$output" > "/tmp/claude-statusline-${TMUX_PANE}"
-else
-  printf '%s\n' "$output"
-fi
+[ -n "$TMUX_PANE" ] && printf '%s\n' "$output" > "/tmp/agent-statusline-${TMUX_PANE}"
+printf '%s\n' "$output"
