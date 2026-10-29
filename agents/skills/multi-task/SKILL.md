@@ -131,18 +131,47 @@ Base branch: <dependency branch> | <base>. Changes from <dependency ID> are alre
 Evidence directory: <wt>/.evidence/<slug>/
 Commits: commit every task change on <branch> before reporting. Dependent tasks branch from this commit. Never push.
 Status: the coordinator owns it. Do not update the task source or tracker; report only.
-Shared infrastructure: start no long-running servers on default ports; follow the project's rules for test suites running in parallel.
+Shared infrastructure: start no long-running servers on default ports; follow the project's rules for test suites running in parallel. Lock exclusive resources as described in <abs path to multi-task/SKILL.md>, section "Shared resources".
 Stop: do not start another task, do not touch other worktrees.
 Delivery, last message: State (VALIDATED | PENDING | BLOCKED), commit sha, changed files, evidence path, human validation needed, blockers.
 ```
 
 Start every `pending` task whose dependencies are all `implemented` and whose conflict partners are not `running`, up to `--parallel`.
 
+## Shared resources
+
+A shared resource holds state outside the worktree: a physical device, emulator, test database, staging environment, browser with an authenticated session, or external service with mutable state.
+
+Lock one only when concurrent use can collide, change shared state or make results non-deterministic. Two workers running isolated tests on the same server need no lock. The project's instructions name exclusive resources; otherwise the worker decides by this rule.
+
+Hold the lock for the duration of use, not the whole task. `<locks>` is `$TASK_LOCKS_DIR` when set (a directory shared by several repositories that use the same device or environment), else `<git common dir>/locks`, which every worktree of this repository sees:
+
+```bash
+locks="${TASK_LOCKS_DIR:-$(git rev-parse --path-format=absolute --git-common-dir)/locks}"; mkdir -p "$locks"
+token="<run>/<slug>/$(date +%s)"                                     # keep it; release needs it
+mkdir "$locks/<resource>" &&                                         # atomic; fails: held, read owner
+  printf 'resource=%s\nrun=%s\nworker=%s\ntoken=%s\nacquired=%s\n' \
+    <resource> <run> <slug> "$token" "$(date -u +%FT%TZ)" > "$locks/<resource>/owner"
+# use the resource
+grep -qx "token=$token" "$locks/<resource>/owner" && rm -r "$locks/<resource>"   # release only your own lock
+```
+
+Each shell call is separate: a `trap` in one does not cover the next. Acquire and release explicitly, and release before delivering, on failure too.
+
+Held: wait and retry. Waiting is not a failed attempt. Still held after 5 minutes, or the wait the project's instructions set: deliver `BLOCKED: resource <resource> busy (held by <owner>)`.
+
+A lock prevents incompatible concurrent use. It is neither the retry budget nor the validation gate; both stay in implement-task.
+
+Lock cleanup by the coordinator: only locks whose `run` is this run and whose `worker` is not live. A lock with no `owner` file yet is mid-acquisition: leave it. A lock from another run or repository: leave it and report it.
+
+A lock prevents incompatible concurrent use. It is neither the retry budget nor the validation gate; both stay in implement-task.
+
 ## 4. Loop
 
 On each worker delivery:
 
-1. Parse State, sha and evidence path.
+1. Parse State, sha and evidence path. The worker is no longer live: clean up its locks (Shared resources).
+   `BLOCKED: resource <resource> busy`: task becomes `waiting: <resource>`. Not a block: dependents are untouched and no retry is consumed. Skip steps 2–4 for it.
 2. Operational checks, in the worktree, before anything else:
 
    ```bash
@@ -155,10 +184,10 @@ On each worker delivery:
    Any check fails: `blocked: delivery mismatch <which>`. Do not read the diff, rerun tests or reinterpret the evidence; that is review, which implement-task already did.
 3. `VALIDATED`: task becomes `implemented`. `PENDING` with no blockers and a non-empty human validation list: task becomes `implemented (human pending)` and unblocks dependents; this is this skill's policy, chosen so a manual check never stalls the chain, and every such task is listed under `Human validation` and repeated in the report. `--gate human` turns it off: those tasks stay `pending human` and hold dependents until the user marks them in the state file.
 4. `PENDING` for any other reason, or `BLOCKED`: task becomes `blocked: <reason>`. Every task downstream becomes `blocked: upstream TASK-NNN`. Do not fix, do not re-prompt with a hint. One retry only when the worker itself names a transient cause (lock, network). Second failure stays blocked.
-5. For every task now ready, build its worktree (step 2) and start it (step 3).
+5. For every task now ready, build its worktree (step 2) and start it (step 3). A `waiting: <resource>` task is ready again once `<locks>/<resource>` is gone: restart it in the same worktree with the Resume prompt (Resume step 2).
 6. Rewrite the state file.
 
-Loop until no task is `pending`, `pending human` or `running`.
+Loop until no task is `pending`, `pending human`, `waiting` or `running`.
 
 Herdr: after recording a delivery, send that worker its kind's compact command from `../references/model-levels.md` (`herdr agent prompt <slug> "<compact>" --wait --timeout 120000`) and leave the pane open. Close panes only when the user asks.
 
@@ -194,7 +223,7 @@ task/2026-10-27/task-001, task/2026-10-27/task-002, task/2026-10-27/task-003
 - TASK-001 + TASK-003: config/routes.rb
 ```
 
-States: `pending`, `running`, `implemented`, `implemented (human pending)`, `pending human` (only under `--gate human`), `blocked: <reason>`. Nothing else.
+States: `pending`, `running`, `implemented`, `implemented (human pending)`, `pending human` (only under `--gate human`), `waiting: <resource>`, `blocked: <reason>`. Nothing else.
 
 ## Resume
 
@@ -205,6 +234,7 @@ For every task not `pending`:
 1. `git worktree list` and `git rev-parse --verify <branch>`: branch exists, worktree missing, `git worktree add <wt> <branch>`; branch missing, state back to `pending`.
 2. `running` with no live agent: restart a worker in the same worktree, same prompt plus "Work may already exist on this branch; read `git log` and `.evidence/` before continuing." Its delivery goes through the loop as usual.
 3. `implemented` whose operational checks no longer pass (dirty worktree, HEAD moved): `blocked: delivery mismatch`, dependents not yet started stay `pending`.
+4. Locks: clean up as in Shared resources. Never remove a lock without checking its `run` and `worker`.
 
 Live workers from a previous coordinator (`herdr agent list` shows the slugs): adopt them, `herdr agent wait` on each, do not restart. Then continue the loop.
 
@@ -220,6 +250,7 @@ List each conflicting pair under `Predicted conflicts`. This reads git only; it 
 
 - All tasks `implemented`: `State: complete`. Report.
 - No task `pending` or `running` and at least one `blocked`: `State: blocked`. Report.
+- Nothing `running`, and every `waiting` task's lock is held by another run or repository: `State: blocked: awaiting resource <resource> (held by <owner>)`. Report. The user prompts `continue the multi-task loop` once it is free.
 - Nothing `running`, only `pending human` left (`--gate human`): `State: blocked: awaiting human validation`. Report. The user marks those tasks `implemented` in the state file and prompts `continue the multi-task loop`.
 - Cycle, or missing criteria for every task: stop and ask. A previous state file: Resume, above.
 - User says stop: record `State: blocked: stopped by user`, leave workers and worktrees as they are.
