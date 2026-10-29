@@ -78,12 +78,13 @@ Do not manufacture failing tests for criteria better demonstrated through screen
 
 ### Failure recovery
 
-After three unsuccessful attempts on the same failure:
+Classify every failure before acting on it:
 
-1. Stop repeating the approach.
-2. Reassess the root cause.
-3. Attempt one materially different solution within scope.
-4. If it fails, stop and report the blocker.
+- **Implementation defect:** the code is wrong. Fix the code.
+- **Test defect:** concrete evidence of an error in the test, fixture, assertion or harness (obsolete selector, invalid fixture, broken synchronization, contradiction with the criterion's text). Record the evidence, then fix the check without weakening what it asserts about the criterion. No such evidence: the failure stays open as a possible implementation defect; change neither code nor test on a guess.
+- **Environmental:** infrastructure, not code (service down, port taken, resource locked, network). Never change code for it. Fix the environment when it is within reach; otherwise report the blocker.
+
+Retry budget: after two attempts on the same failure without progress, stop. Progress means the failure changed or narrowed. A further attempt needs a new hypothesis and a check that confirms or refutes it; record both. No new hypothesis: stop and report the blocker.
 
 The task needs files or behavior the plan did not name: update `plan.md` when the change stays inside the acceptance criteria. Otherwise stop and report the scope gap.
 
@@ -115,6 +116,8 @@ Run the checks defined by the project:
 
 Fix failures introduced by the task.
 
+**Evidence reuse:** a passing check stays valid until something it depends on changes: the covered code, dependencies, configuration, environment or the check itself. Rerun only checks invalidated that way. Lint, typecheck and build, where the project has them, always run on the final state.
+
 Compare against the baseline:
 
 - **Introduced:** caused by the implementation; fix.
@@ -125,7 +128,7 @@ A pre-existing failure does not automatically block completion, but it cannot be
 
 Have one reviewer subagent inspect the complete diff with the task, acceptance criteria, project instructions and test evidence. It reports unmet criteria, regressions, evidence that does not support its criterion, and out-of-scope changes.
 
-The implementer fixes confirmed findings and reruns the final validation. Record unresolved findings as residual risks.
+The implementer fixes confirmed findings and reruns the checks those fixes affect (evidence reuse, above). Record unresolved findings as residual risks.
 
 If reviewer subagents are unavailable, perform self-review and report the limitation.
 
@@ -204,7 +207,7 @@ Human validation unavoidable: provide minimal steps and expected results.
 
 ## 9. Final report
 
-1. **State:** implementation validated, pending or blocked; tracker state separately.
+1. **State:** implementation validated, pending or blocked; tracker state separately. Blocked: name the proof that is blocked and the objective condition to continue (for example `staging DB reachable`, `emulator lock free`).
 2. **Changes:** files modified and purpose.
 3. **Checks:** commands, results and baseline comparison.
 4. **Evidence:** criterion, implementation, before, after and artifact.
