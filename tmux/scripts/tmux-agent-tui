@@ -50,7 +50,7 @@ build() {
     case " $seen " in *" $loc "*) continue ;; esac
     seen="$seen $loc"
     [ ${#wname} -gt 18 ] && wname="${wname:0:17}…"
-    meta=$(awk -F' · ' 'NR==1{print $1 (NF>1?" · "$2:"")}' "/tmp/claude-statusline-$p" 2>/dev/null)
+    meta=$(awk -F' · ' 'NR==1{print $1 (NF>1?" · "$2:"")}' "/tmp/agent-statusline-$p" 2>/dev/null)
     if [ -n "$teststate" ]; then
       st="$teststate"                                            # test injection
     else

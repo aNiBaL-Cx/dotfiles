@@ -70,6 +70,21 @@ ln -sfn "$repo/.claude/statusline-command.sh" "$HOME/.claude/statusline-command.
 ln -sfn "$repo/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 echo "linked ~/.claude/statusline-command.sh ~/.claude/CLAUDE.md"
 
+# Codex: no statusLine hook, so Stop/PostToolUse hooks rebuild the same line from
+# the session rollout. hooks.json is shared with herdr and caveman, so merge the
+# entry in (idempotent) rather than linking the file.
+chmod +x "$repo/.codex/statusline-command.sh"
+ln -sfn "$repo/.codex/statusline-command.sh" "$HOME/.codex/statusline-command.sh"
+hooks="$HOME/.codex/hooks.json"
+[ -f "$hooks" ] || echo '{"hooks":{}}' > "$hooks"
+cmd="$HOME/.codex/statusline-command.sh"
+jq --arg cmd "$cmd" '
+  reduce ("Stop", "PostToolUse") as $event (.;
+    if any(.hooks[$event][]?.hooks[]?; .command == $cmd) then .
+    else .hooks[$event] += [{hooks: [{type: "command", command: $cmd, timeout: 5}]}] end)
+' "$hooks" > "$hooks.tmp" && mv "$hooks.tmp" "$hooks"
+echo "linked ~/.codex/statusline-command.sh (Stop + PostToolUse in ~/.codex/hooks.json)"
+
 # Agent skills shared by Claude Code (~/.claude/skills) and Codex/Copilot/Gemini
 # (~/.agents/skills). Per-skill dir links, so vault-linked skills coexist. An
 # existing real directory is skipped — ln -sfn would nest the link inside it.

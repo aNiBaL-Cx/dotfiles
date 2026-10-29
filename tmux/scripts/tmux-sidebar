@@ -41,7 +41,7 @@ build() {
     case " $seen " in *" $loc "*) continue ;; esac
     seen="$seen $loc"
     [ ${#wname} -gt 17 ] && wname="${wname:0:16}…"
-    meta=$(awk -F' · ' 'NR==1{print $1 (NF>1?" · "$2:"")}' "/tmp/claude-statusline-$pane" 2>/dev/null)
+    meta=$(awk -F' · ' 'NR==1{print $1 (NF>1?" · "$2:"")}' "/tmp/agent-statusline-$pane" 2>/dev/null)
     [ -n "$teststate" ] && st="$teststate" || st=$(agent_state "$pane" "$loc" "$title")
     locs+=("$loc"); names+=("$wname"); metas+=("$meta"); states+=("$st")
   done < <( { [ -n "$AGENT_PANES_FILE" ] && cat "$AGENT_PANES_FILE" || tmux list-panes -a -F '#{pane_id}|#{session_name}:#{window_index}|#{window_name}|#{pane_current_command}|#{pane_title}'; } | sort -t'|' -k2)
