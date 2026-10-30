@@ -81,6 +81,8 @@ two hook entries into `~/.codex/hooks.json` (shared with herdr and caveman).
 
 **Menu bar: Linear work (optional).** `swiftbar/linear-work.2m.sh` is a [SwiftBar](https://github.com/swiftbar/SwiftBar) plugin. The bar shows SF Symbol counters for in-progress tickets, unread notifications and working agents. The dropdown lists your started Linear issues by priority with state, linked PRs (review decision, CI rollup, unread GitHub notification) and the herdr agents whose session, workspace/tab label, cwd or title contains the ticket ID (or its bare number, as `tabs-sync` names tabs); clicks open Linear/GitHub or focus the agent. Only the `default` herdr session by default; tick others in the "herdr sessions" submenu (saved in `~/.config/swiftbar/linear-work-sessions`). A "Legend" submenu explains every icon and color. Point SwiftBar's plugin folder at `swiftbar/` and put a Linear personal API key in `~/.linear_api_token` (`chmod 600`, shared with `lineark`).
 
+**Menu bar: Timebox (optional).** `swiftbar/timebox.1m.sh` shows the current block of a daily plan file in the menu bar, with the minutes left, notifies when the block changes, and ticks a block when clicked. It reads `<TIMEBOX_PLAN_DIR>/<YYYY-MM-DD>.md`, one block per line as `- [ ] HH:MM–HH:MM <text>` (en dash); 🎯 blocks show the text after ` — ` as the label. Configure in `~/.config/swiftbar/timebox.env`: `TIMEBOX_PLAN_DIR` (required) and `TIMEBOX_PLAN_URL` (optional, `<date>` placeholder, opened by "Open plan" and by the notification). Whatever writes the plan file is outside this repo.
+
 ## Install
 
 ```sh
