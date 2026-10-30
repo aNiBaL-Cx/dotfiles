@@ -48,7 +48,7 @@ Write `plan.md` in the evidence directory (step 6), approximately 5–10 lines:
 - Criteria requiring human validation.
 - Least confident decisions.
 
-A least confident decision would change the design if wrong: have one analysis subagent challenge it before you edit. Give it the plan and relevant code, not your reasoning. No such decision: skip the challenge.
+A least confident decision would change the design if wrong: have one analysis subagent challenge it before you edit: a fresh subagent, never a fork, which inherits your conversation. Give it the plan and relevant code, not your reasoning. No such decision: skip the challenge.
 
 If subagents are unavailable, record that limitation and continue.
 
@@ -126,7 +126,7 @@ Compare against the baseline:
 
 A pre-existing failure does not automatically block completion, but it cannot be used to excuse an unverified criterion.
 
-Have one reviewer subagent inspect the complete diff with the task, acceptance criteria, project instructions and test evidence. It reports unmet criteria, regressions, evidence that does not support its criterion, and out-of-scope changes.
+Have one reviewer subagent (fresh, never a fork) inspect the complete diff with the task, acceptance criteria, project instructions and test evidence. It reports unmet criteria, regressions, evidence that does not support its criterion, and out-of-scope changes.
 
 The implementer fixes confirmed findings and reruns the checks those fixes affect (evidence reuse, above). Record unresolved findings as residual risks.
 
