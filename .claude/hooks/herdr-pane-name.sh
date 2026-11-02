@@ -84,7 +84,9 @@ for _ in range(30):
     if agent:
         break
     time.sleep(0.5)
-if not agent:
+# Codex runs hooks in its shared app-server daemon, whose HERDR_PANE_ID is the pane
+# that started the daemon, not this session's: never rename another CLI's agent.
+if not agent or agent.get("agent") != cli:
     sys.exit(0)
 
 current_name = agent.get("name")
