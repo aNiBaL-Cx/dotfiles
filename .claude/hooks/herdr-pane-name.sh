@@ -22,8 +22,15 @@ except Exception:
 if data.get("agent_id"):
     sys.exit(0)
 
+# A second Codex account (CODEX_HOME=~/.codex-personal) is told apart by the first letter
+# of its home suffix: codexp. ~/.codex stays plain codex.
+tag = cli
+home = os.path.basename(os.environ.get("CODEX_HOME", "").rstrip("/"))
+if cli == "codex" and home.startswith(".codex-") and len(home) > 7:
+    tag = "codex" + home[7].lower()
+
 model = str(data.get("model") or "")
-model = next((n for n in ("Opus", "Fable", "Sonnet", "Haiku") if n.lower() in model.lower()), cli.capitalize())
+model = next((n for n in ("Opus", "Fable", "Sonnet", "Haiku") if n.lower() in model.lower()), tag.capitalize())
 
 
 def prefix_for(cwd):
@@ -63,7 +70,7 @@ def run(*args):
 
 
 prefix = prefix_for(str(data.get("cwd") or os.getcwd()))
-base = f"{prefix}_{cli}" if prefix else cli
+base = f"{prefix}_{tag}" if prefix else tag
 
 state_file = f"/tmp/herdr-pane-name-{pane.replace(':', '_')}.json"
 try:
