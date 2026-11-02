@@ -72,18 +72,41 @@ echo "linked ~/.claude/statusline-command.sh ~/.claude/CLAUDE.md"
 
 # Codex: no statusLine hook, so Stop/PostToolUse hooks rebuild the same line from
 # the session rollout. hooks.json is shared with herdr and caveman, so merge the
-# entry in (idempotent) rather than linking the file.
+# entry in (idempotent) rather than linking the file. Every ~/.codex* home (one
+# per account, via CODEX_HOME) gets the hook and the hooks feature flag.
 chmod +x "$repo/.codex/statusline-command.sh"
 ln -sfn "$repo/.codex/statusline-command.sh" "$HOME/.codex/statusline-command.sh"
-hooks="$HOME/.codex/hooks.json"
-[ -f "$hooks" ] || echo '{"hooks":{}}' > "$hooks"
 cmd="$HOME/.codex/statusline-command.sh"
-jq --arg cmd "$cmd" '
-  reduce ("Stop", "PostToolUse") as $event (.;
-    if any(.hooks[$event][]?.hooks[]?; .command == $cmd) then .
-    else .hooks[$event] += [{hooks: [{type: "command", command: $cmd, timeout: 5}]}] end)
-' "$hooks" > "$hooks.tmp" && mv "$hooks.tmp" "$hooks"
-echo "linked ~/.codex/statusline-command.sh (Stop + PostToolUse in ~/.codex/hooks.json)"
+pane_name="$HOME/.claude/hooks/herdr-pane-name.sh"
+for home in "$HOME"/.codex*/; do
+  home=${home%/}
+  [ -f "$home/config.toml" ] || continue
+  hooks="$home/hooks.json"
+  [ -f "$hooks" ] || echo '{"hooks":{}}' > "$hooks"
+  jq --arg cmd "$cmd" '
+    reduce ("Stop", "PostToolUse") as $event (.;
+      if any(.hooks[$event][]?.hooks[]?; .command == $cmd) then .
+      else .hooks[$event] += [{hooks: [{type: "command", command: $cmd, timeout: 5}]}] end)
+  ' "$hooks" > "$hooks.tmp" && mv "$hooks.tmp" "$hooks"
+  jq --arg cmd "$pane_name codex" '
+    if any(.hooks.SessionStart[]?.hooks[]?; .command == $cmd) then .
+    else .hooks.SessionStart += [{matcher: "startup|resume|clear|compact", hooks: [{type: "command", command: $cmd, timeout: 10}]}] end
+  ' "$hooks" > "$hooks.tmp" && mv "$hooks.tmp" "$hooks"
+  if ! grep -q '^\[features\]' "$home/config.toml"; then
+    printf '\n[features]\nhooks = true\n' >> "$home/config.toml"
+  elif ! grep -q '^hooks = true' "$home/config.toml"; then
+    echo "warning: add 'hooks = true' under [features] in $home/config.toml"
+  fi
+  echo "hooked $cmd (Stop + PostToolUse) and herdr-pane-name.sh (SessionStart) in $hooks"
+done
+
+# Grok loads every file in ~/.grok/hooks/, and herdr owns herdr.json there, so the
+# Herdr pane/agent naming hook gets a file of its own.
+if [ -d "$HOME/.grok" ]; then
+  mkdir -p "$HOME/.grok/hooks"
+  printf '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"%s grok","timeout":10}]}]}}\n' "$pane_name" > "$HOME/.grok/hooks/pane-name.json"
+  echo "wrote ~/.grok/hooks/pane-name.json"
+fi
 
 # Agent skills shared by Claude Code (~/.claude/skills) and Codex/Copilot/Gemini
 # (~/.agents/skills). Per-skill dir links, so vault-linked skills coexist. An
