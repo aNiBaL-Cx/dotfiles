@@ -73,7 +73,9 @@ echo "linked ~/.claude/statusline-command.sh ~/.claude/CLAUDE.md"
 # Codex: no statusLine hook, so Stop/PostToolUse hooks rebuild the same line from
 # the session rollout. hooks.json is shared with herdr and caveman, so merge the
 # entry in (idempotent) rather than linking the file. Every ~/.codex* home (one
-# per account, via CODEX_HOME) gets the hook and the hooks feature flag.
+# per account, via CODEX_HOME) gets the hook and the hooks feature flag. Codex keeps
+# a trusted hash per hook in config.toml; a new or changed entry may need approving
+# in /hooks before it runs.
 chmod +x "$repo/.codex/statusline-command.sh"
 ln -sfn "$repo/.codex/statusline-command.sh" "$HOME/.codex/statusline-command.sh"
 cmd="$HOME/.codex/statusline-command.sh"
@@ -92,6 +94,20 @@ for home in "$HOME"/.codex*/; do
     if any(.hooks.SessionStart[]?.hooks[]?; .command == $cmd) then .
     else .hooks.SessionStart += [{matcher: "startup|resume|clear|compact", hooks: [{type: "command", command: $cmd, timeout: 10}]}] end
   ' "$hooks" > "$hooks.tmp" && mv "$hooks.tmp" "$hooks"
+  # Work + personal Codex: one account lives in ~/.codex, the other in e.g.
+  # ~/.codex-personal (launched with CODEX_HOME). `herdr integration install codex`
+  # only wires ~/.codex, so a second home gets a copy of its state hook here;
+  # without it Herdr still sees the agent but never gets its session id.
+  # Re-run install after `herdr integration install codex` to refresh the copy.
+  herdr_state="$HOME/.codex/herdr-agent-state.sh"
+  if [ "$home" != "$HOME/.codex" ] && [ -f "$herdr_state" ]; then
+    cp "$herdr_state" "$home/herdr-agent-state.sh"
+    jq --arg cmd "bash '$home/herdr-agent-state.sh' session" '
+      if any(.hooks.SessionStart[]?.hooks[]?; .command == $cmd) then .
+      else .hooks.SessionStart = [{hooks: [{type: "command", command: $cmd, timeout: 10}]}] + (.hooks.SessionStart // []) end
+    ' "$hooks" > "$hooks.tmp" && mv "$hooks.tmp" "$hooks"
+    echo "copied herdr-agent-state.sh into $home (SessionStart)"
+  fi
   if ! grep -q '^\[features\]' "$home/config.toml"; then
     printf '\n[features]\nhooks = true\n' >> "$home/config.toml"
   elif ! grep -q '^hooks = true' "$home/config.toml"; then
