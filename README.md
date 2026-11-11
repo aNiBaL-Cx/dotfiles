@@ -123,13 +123,18 @@ those are symlinked in from elsewhere. Skills that are not tied to one vault liv
 in `agents/skills/`; each is linked per-dir into both `~/.claude/skills/` and
 `~/.agents/skills/` (Codex/Copilot/Gemini read the latter).
 
-For projects that need real files instead of symlinks, list target dirs (one per
-line, `~` ok, `#` comments) in `agents/skills-copy.local` (gitignored), e.g.
-`~/projects/foo/.claude/skills`. Each `install.sh` run refreshes only the skills
-that dir already has: no skill is added or removed, and files that exist only in
-the target copy are kept. `SKILLS_COPY_ADD=1 ./install.sh` also adds the repo
-skills a target lacks; it still removes nothing.
-Missing dirs, relative paths and the two symlinked dirs above are skipped.
+Per-project skill dirs go in `agents/skills-copy.local` (gitignored), one per
+line, `~` ok, `#` comments:
+
+    ~/projects/foo/.agents/skills         # copies
+    link ~/projects/bar/.agents/skills    # symlinks
+
+A plain line makes every repo skill there a real copy, replacing a symlink.
+A `link` line makes them symlinks, replacing a copy, unless the copy holds files
+the repo skill lacks: that one is kept and reported. Only skills the dir already
+has are touched; `SKILLS_COPY_ADD=1 ./install.sh` also adds the ones it lacks.
+No skill is ever removed. Missing dirs, relative paths and dirs that resolve to
+`~/.claude/skills`, `~/.agents/skills` or `agents/skills` are skipped.
 
 Third-party skills are not copied here; install them from their own repos, which
 also keeps them updatable (`npx skills update -g`):

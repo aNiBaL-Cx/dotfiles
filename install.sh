@@ -140,39 +140,56 @@ for d in "$repo"/agents/skills/*/; do
   done
 done
 
-# Hard copies for projects that need real files (sandboxed agents, repos that
-# commit their skills). agents/skills-copy.local is gitignored: one target dir
-# per line, ~ allowed, # comments. Only skills the target already has are
-# refreshed; SKILLS_COPY_ADD=1 also adds the repo skills it lacks. Nothing is
-# ever removed, and files that exist only in the target copy are kept.
+# Per-project skills (sandboxed agents, repos that commit their skills).
+# agents/skills-copy.local is gitignored: one target dir per line, ~ allowed,
+# # comments. A plain line means copies: a symlinked skill there is replaced by
+# a real copy. A line starting with "link " means symlinks: a copied skill there
+# is replaced by a symlink, unless it holds files the repo skill lacks (then it
+# is skipped and reported). Only skills the target already has are touched;
+# SKILLS_COPY_ADD=1 also adds the repo skills it lacks. No skill is ever removed.
 copy_list="$repo/agents/skills-copy.local"
+resolve() { (cd "$1" 2>/dev/null && pwd -P); }
+protected=" $(resolve "$HOME/.claude/skills") $(resolve "$HOME/.agents/skills") $(resolve "$repo/agents/skills") "
 if [ -f "$copy_list" ]; then
   while IFS= read -r target || [ -n "$target" ]; do
     target="${target%%#*}"; target="${target%"${target##*[![:space:]]}"}"
     target="${target#"${target%%[![:space:]]*}"}"
     [ -n "$target" ] || continue
-    target="${target/#\~/$HOME}"
-    # Copying into the symlinked dirs above would replace the links, and later
-    # repo edits would stop reaching them; a relative path depends on the cwd.
-    case "${target%/}" in
-      "$HOME/.claude/skills"|"$HOME/.agents/skills"|[!/]*)
-        echo "skipped $target (relative, or one of the symlinked skills dirs)"; continue ;;
+    mode=copy
+    case "$target" in
+      link[[:space:]]*) mode=link; target="${target#link}"; target="${target#"${target%%[![:space:]]*}"}" ;;
     esac
+    target="${target/#\~/$HOME}"
+    case "$target" in /*) ;; *) echo "skipped $target (relative path)"; continue ;; esac
     [ -d "$target" ] || { echo "skipped $target (no such directory)"; continue; }
-    updated=0; added=0
+    # Resolved, so a project dir that is itself a symlink to one of these is caught:
+    # writing there would replace the global links or the repo's own skills.
+    case "$protected" in
+      *" $(resolve "$target") "*) echo "skipped $target (resolves to a global skills dir or the repo)"; continue ;;
+    esac
+    updated=0; added=0; kept=""
     for d in "$repo"/agents/skills/*/; do
-      name="$(basename "$d")"
-      if [ -d "$target/$name" ]; then
+      name="$(basename "$d")"; src="${d%/}"; dst="$target/$name"
+      if [ -d "$dst" ]; then
         updated=$((updated + 1))
       elif [ "${SKILLS_COPY_ADD:-0}" = 1 ]; then
         added=$((added + 1))
       else
         continue
       fi
-      [ -L "$target/$name" ] && rm "$target/$name"
-      rsync -a "$d" "$target/$name/"
+      if [ "$mode" = copy ]; then
+        [ -L "$dst" ] && rm "$dst"
+        rsync -a "$d" "$dst/"
+      # diff exits 1 on any difference; under pipefail that would hide grep's match.
+      elif [ -d "$dst" ] && [ ! -L "$dst" ] && { diff -rq "$src" "$dst" || true; } | grep -qF "Only in $dst"; then
+        kept="$kept $name"; updated=$((updated - 1))
+      else
+        { [ -d "$dst" ] && [ ! -L "$dst" ] && rm -rf "$dst"; } || true
+        ln -sfn "$src" "$dst"
+      fi
     done
-    echo "updated $updated, added $added skills in $target"
+    echo "$mode: updated $updated, added $added skills in $target"
+    [ -z "$kept" ] || echo "  kept as copies (they hold files the repo lacks):$kept"
   done < "$copy_list"
 fi
 
