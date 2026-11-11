@@ -26,12 +26,21 @@ Unreadable or ambiguous source: stop and ask.
 1. Read project instructions (`AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, whichever exist). They override this skill.
 2. Read the task in full: acceptance criteria, dependencies, constraints, linked material.
 3. Every listed criterion is mandatory unless explicitly marked optional.
-4. No acceptance criteria: derive them from the task, record them as assumed, and proceed only if unambiguous. Otherwise stop and ask.
+4. No acceptance criteria: derive them from the task, record them as assumed, and proceed only if unambiguous. Otherwise decide or escalate (below).
 5. Run `git status` and `git stash list`. Record pre-existing changes; never discard or overwrite them.
 6. Already in a worktree (`git rev-parse --git-dir` differs from `git rev-parse --git-common-dir`): work on its current branch and create nothing. It holds uncommitted changes from other work: stop and ask. Otherwise, if the project requires a branch or worktree per task, create it before editing.
 7. Run focused baseline checks covering the affected area. Record existing failures. Run the full suite only if required or inexpensive.
 
 Do not edit code until the scope is clear.
+
+### Decide or escalate
+
+Classify every open question before you stop on it:
+
+- **Reversible and local** (naming, internal structure, which existing helper to reuse, a test layout): decide, record the choice and the rejected alternative in `plan.md` under "Assumed" (create the file in the evidence directory now if step 2 has not run yet), and continue.
+- **Product, contract or irreversible** (user-visible behavior the task does not settle, public API or schema, data migration, anything outside the acceptance criteria): stop.
+
+Stopping means asking the user when one is in the conversation. Under a coordinator (`multi-task`, `pingpong`, `delegate-task`), nobody answers: deliver `BLOCKED: needs input` with the question, the options and your recommendation, so the coordinator can take it to the user. Collect every such question first and deliver them together.
 
 ## 2. Plan
 
@@ -47,6 +56,7 @@ Write `plan.md` in the evidence directory (step 6), approximately 5–10 lines:
 - Each criterion and its proof: test, command output, screenshot or inspection.
 - Criteria requiring human validation.
 - Least confident decisions.
+- Assumed: decisions taken under "Decide or escalate", each with its rejected alternative.
 
 A least confident decision would change the design if wrong: have one analysis subagent challenge it before you edit: a fresh subagent, never a fork, which inherits your conversation. Give it the plan and relevant code, not your reasoning. No such decision: skip the challenge.
 

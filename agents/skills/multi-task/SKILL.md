@@ -19,7 +19,7 @@ Each worker runs the `implement-task` skill (the `SKILL.md` next to this one). I
 /multi-task <task list> [--profile cheap|standard|premium] [--parallel 3] [--gate human]
 ```
 
-- `<task list>`: any mix of sources: a Markdown file with `- [ ]` items, issue IDs or a query the project's tooling can read (Linear, Jira, GitHub), or pasted text. Every task needs acceptance criteria; a task without them is `blocked: no acceptance criteria` from the start.
+- `<task list>`: any mix of sources: a Markdown file with `- [ ]` items, issue IDs or a query the project's tooling can read (Linear, Jira, GitHub), or pasted text. Every task needs acceptance criteria; a task without them goes through Shape (step 1b) and waits for the user's approval before it can start.
 - `--profile` default `standard`. Sets worker model level (Start workers).
 - `--parallel` default 3. Workers running at once. Workers share local infrastructure (test databases, dev server ports, memory); the project's rules on running suites side by side cap real parallelism.
 
@@ -63,6 +63,27 @@ for p in .worktrees/ .handoff/; do grep -qx "$p" "$ex" || echo "$p" >> "$ex"; do
 8. Write the state file (below) with every task `pending` and the edge list. Show the graph in the pane and continue; do not wait. The user may edit the edges in the file at any time; the coordinator rereads it before every start and immediately before every rewrite, so a user edit is merged, not overwritten.
 
 Tasks with no edge between them run in parallel.
+
+## 1b. Shape
+
+A task with no acceptance criteria, or criteria too vague to verify, is `pending criteria`. For each one, start a PO worker as in step 3, with these differences:
+
+- Name `<slug>-po`. No worktree: it runs read-only in the main checkout and edits nothing there.
+- Level mid; senior under `--profile premium`.
+- It writes one file, `.handoff/multi-task_<run>_criteria/<slug>.md`, never the state file (the coordinator rewrites that whole) and never the task source or tracker: the coordinator does not edit the source, so its PO does not either. The coordinator lists the path under `## Drafted criteria`.
+
+```text
+Objective: draft scope and acceptance criteria for TASK-NNN, source <source reference>. <title and full text, or how to read them from the source>
+When the project defines its own PO skill or agent, follow it for research and format.
+Code is read-only. Architecture, file layout and contracts are out of scope.
+Write only <abs repo root>/.handoff/multi-task_<run>_criteria/<slug>.md, first line "Status: draft": in scope, out of scope, one scenario per criterion with how to verify it, files you expect it to touch, open questions. Never guess an open question.
+Publish nothing: no tracker, no source edits, no commits.
+Delivery, last message: done, or blocked with the reason.
+```
+
+A live PO counts toward `--parallel`, and the coordinator waits on it in the same round-robin as workers. Its delivery skips the Loop steps (no sha, no operational checks) and changes nothing but the `Drafted criteria` list. The task stays `pending criteria`, and so do its dependents: they wait on it as on any unfinished dependency. Tasks that arrived with criteria start as usual; shaping never holds them.
+
+**Gate, never skipped:** criteria nobody approved make every later validation check the PO's guess. The user edits the draft as needed, changes its first line to `Status: approved`, and prompts `continue the multi-task loop`. On continue, every task whose draft says approved becomes `pending`; redo its `conflicts with` edges from the draft's expected files before starting anything. Its worker prompt carries the approved criteria file as the acceptance criteria.
 
 ## 2. Worktrees
 
@@ -117,7 +138,15 @@ One background subagent per ready task, through the harness's own subagent mecha
 
 Neither Herdr nor a subagent mechanism: stop and say so. The coordinator never implements tasks itself.
 
-A subagent worker usually cannot start subagents of its own, so implement-task's plan challenge and diff review fall back to self-review. Prefer Herdr when independent review matters. In subagent mode, set `**Review:** self only` in the state file and repeat it in the report.
+A subagent worker usually cannot start subagents of its own, so the coordinator starts the reviewer instead. Starting a reviewer is not reviewing: the coordinator never reads the diff or judges the findings.
+
+- The worker prompt includes its `Review (subagent mode only)` line (Worker prompt).
+- On a `VALIDATED` delivery that passes the operational checks (Loop step 2), start a fresh reviewer subagent, never a fork, at senior level, and set the task to `in review`. Give it the task, the acceptance criteria, `<wt>`, `git -C <wt> diff <start>..HEAD`, the evidence path and the project instructions; not the worker's reasoning. It reports unmet criteria, regressions, evidence that does not support its criterion, and out-of-scope changes, as a list, or `clean`.
+- `clean`: the task becomes `implemented`. Findings: send them to the worker (SendMessage) and review its next delivery with another fresh reviewer.
+- At most 3 review rounds. Findings still open after the third: the task becomes `implemented (residual findings)`, listed under `Human validation` with the findings, and it unblocks dependents. Under `--gate human` it becomes `pending human` instead and holds dependents.
+- Neither SendMessage nor any way to resume the worker: fall back to self-review, set `**Review:** self only` in the state file and repeat it in the report.
+
+The plan challenge in implement-task step 2 stays self-review in subagent mode; record it in the state file.
 
 ### Worker prompt
 
@@ -125,7 +154,7 @@ Write it to a temp file outside the repo. Shape:
 
 ```text
 Read <abs path to implement-task/SKILL.md> and apply it to the task below. Work only inside <wt>, on branch <branch>.
-Task: TASK-NNN, source <source reference>. <title, full text and acceptance criteria, or how to read them from the source>
+Task: TASK-NNN, source <source reference>. <title, full text and acceptance criteria, or how to read them from the source; a shaped task: the approved criteria file path>
 Commit messages and anything the project names after a ticket use the source reference, never TASK-NNN.
 Base branch: <dependency branch> | <base>. Changes from <dependency ID> are already on this branch; do not redo them.
 Evidence directory: <wt>/.evidence/<slug>/
@@ -134,6 +163,7 @@ Status: the coordinator owns it. Do not update the task source or tracker; repor
 Shared infrastructure: start no long-running servers on default ports; follow the project's rules for test suites running in parallel. Lock exclusive resources as described in <abs path to multi-task/SKILL.md>, section "Shared resources".
 Stop: do not start another task, do not touch other worktrees.
 Delivery, last message: State (VALIDATED | PENDING | BLOCKED), commit sha, changed files, evidence path, human validation needed, blockers.
+Review (subagent mode only): skip implement-task's reviewer subagent. After your delivery, the coordinator sends you review findings: classify each as confirmed or rejected with evidence, fix the confirmed ones, rerun the checks they affect, and deliver again.
 ```
 
 Start every `pending` task whose dependencies are all `implemented` and whose conflict partners are not `running`, up to `--parallel`.
@@ -164,8 +194,6 @@ A lock prevents incompatible concurrent use. It is neither the retry budget nor 
 
 Lock cleanup by the coordinator: only locks whose `run` is this run and whose `worker` is not live. A lock with no `owner` file yet is mid-acquisition: leave it. A lock from another run or repository: leave it and report it.
 
-A lock prevents incompatible concurrent use. It is neither the retry budget nor the validation gate; both stay in implement-task.
-
 ## 4. Loop
 
 On each worker delivery:
@@ -182,12 +210,12 @@ On each worker delivery:
    ```
 
    Any check fails: `blocked: delivery mismatch <which>`. Do not read the diff, rerun tests or reinterpret the evidence; that is review, which implement-task already did.
-3. `VALIDATED`: task becomes `implemented`. `PENDING` with no blockers and a non-empty human validation list: task becomes `implemented (human pending)` and unblocks dependents; this is this skill's policy, chosen so a manual check never stalls the chain, and every such task is listed under `Human validation` and repeated in the report. `--gate human` turns it off: those tasks stay `pending human` and hold dependents until the user marks them in the state file.
-4. `PENDING` for any other reason, or `BLOCKED`: task becomes `blocked: <reason>`. Every task downstream becomes `blocked: upstream TASK-NNN`. Do not fix, do not re-prompt with a hint. One retry only when the worker itself names a transient cause (lock, network). Second failure stays blocked.
+3. `VALIDATED`: task becomes `implemented`; in subagent mode, only after the coordinator-run review (Start workers, Subagents). `PENDING` with no blockers and a non-empty human validation list: task becomes `implemented (human pending)` and unblocks dependents; this is this skill's policy, chosen so a manual check never stalls the chain, and every such task is listed under `Human validation` and repeated in the report. `--gate human` turns it off: those tasks stay `pending human` and hold dependents until the user marks them in the state file.
+4. `PENDING` for any other reason, or `BLOCKED`: task becomes `blocked: <reason>`. Every task downstream becomes `blocked: upstream TASK-NNN`. Do not fix, do not re-prompt with a hint. One retry only when the worker itself names a transient cause (lock, network). Second failure stays blocked. `BLOCKED: needs input`: also copy the worker's questions, options and recommendation under `## Open questions`; the user answers there and prompts `continue the multi-task loop`, and the task restarts in the same worktree with the Resume prompt plus the answers; its `blocked: upstream` dependents return to `pending`.
 5. For every task now ready, build its worktree (step 2) and start it (step 3). A `waiting: <resource>` task is ready again once `<locks>/<resource>` is gone: restart it in the same worktree with the Resume prompt (Resume step 2).
 6. Rewrite the state file.
 
-Loop until no task is `pending`, `pending human`, `waiting` or `running`.
+Loop until no task is `pending`, `pending human`, `pending criteria`, `waiting`, `running` or `in review`.
 
 Herdr: after recording a delivery, send that worker its kind's compact command from `../references/model-levels.md` (`herdr agent prompt <slug> "<compact>" --wait --timeout 120000`) and leave the pane open. Close panes only when the user asks.
 
@@ -210,11 +238,17 @@ Herdr: after recording a delivery, send that worker its kind's compact command f
 | TASK-002 | docs/tasks.md:14 | Export button | TASK-001 | none | running | abc123 | | task-002 / p13 | |
 | TASK-003 | pasted:3 | Fix footer copy | none | TASK-001 | pending | | | | |
 
+## Drafted criteria
+- TASK-003: .handoff/multi-task_2026-10-27_criteria/task-003.md (draft)
+
 ## Human validation
 - TASK-001: <steps the worker listed>
 
 ## Blocked
 - TASK-NNN: <reason, since when>
+
+## Open questions
+- TASK-NNN: <question>. Options: <a>, <b>. Recommended: <a>. Answer: <the user writes it here>
 
 ## Merge order
 task/2026-10-27/task-001, task/2026-10-27/task-002, task/2026-10-27/task-003
@@ -223,13 +257,13 @@ task/2026-10-27/task-001, task/2026-10-27/task-002, task/2026-10-27/task-003
 - TASK-001 + TASK-003: config/routes.rb
 ```
 
-States: `pending`, `running`, `implemented`, `implemented (human pending)`, `pending human` (only under `--gate human`), `waiting: <resource>`, `blocked: <reason>`. Nothing else.
+States: `pending criteria`, `pending`, `running`, `in review` (subagent mode only), `implemented`, `implemented (human pending)`, `implemented (residual findings)`, `pending human` (only under `--gate human`), `waiting: <resource>`, `blocked: <reason>`. Nothing else.
 
 ## Resume
 
 A `.handoff/multi-task_*.md` whose `State` is not `complete` exists and no worker of that run is live: reconcile before anything else. Several such files: list them and ask which run to resume. The run ID, task IDs and names come from the file, never from a new graph. The file is a record, not the truth.
 
-For every task not `pending`:
+A `pending criteria` task with no criteria file and no live `<slug>-po`: start its PO again (Shape). For every other task not `pending`:
 
 1. `git worktree list` and `git rev-parse --verify <branch>`: branch exists, worktree missing, `git worktree add <wt> <branch>`; branch missing, state back to `pending`.
 2. `running` with no live agent: restart a worker in the same worktree, same prompt plus "Work may already exist on this branch; read `git log` and `.evidence/` before continuing." Its delivery goes through the loop as usual.
@@ -252,19 +286,20 @@ List each conflicting pair under `Predicted conflicts`. This reads git only; it 
 - No task `pending` or `running` and at least one `blocked`: `State: blocked`. Report.
 - Nothing `running`, and every `waiting` task's lock is held by another run or repository: `State: blocked: awaiting resource <resource> (held by <owner>)`. Report. The user prompts `continue the multi-task loop` once it is free.
 - Nothing `running`, only `pending human` left (`--gate human`): `State: blocked: awaiting human validation`. Report. The user marks those tasks `implemented` in the state file and prompts `continue the multi-task loop`.
-- Cycle, or missing criteria for every task: stop and ask. A previous state file: Resume, above.
+- Nothing `running`, and every remaining task is `pending criteria` with its draft written, or waits on one: `State: blocked: awaiting criteria approval`. Report the drafts and open questions. The user approves as in Shape and prompts `continue the multi-task loop`.
+- Cycle: stop and ask. A previous state file: Resume, above.
 - User says stop: record `State: blocked: stopped by user`, leave workers and worktrees as they are.
 
 ## Limits
 
-- The coordinator never edits code, runs the test suite, reviews a diff, performs functional validation, resolves a conflict, pushes or deploys. Its only merge is the preparation merge in step 2. Review and validation belong to implement-task; the coordinator checks that a delivery is what it claims, not that it is good.
+- The coordinator never edits code, runs the test suite, reviews a diff, performs functional validation, resolves a conflict, pushes or deploys. Its only merge is the preparation merge in step 2. Review and validation belong to implement-task, or in subagent mode to the reviewer the coordinator starts; the coordinator checks that a delivery is what it claims, not that it is good.
 - Workers never push. Branches stay local until the user integrates them in `Merge order`.
 - One worktree per task. Never reuse a worktree for a second task.
-- Agent name = pane label = slug. Target workers by name, never by sidebar position.
+- Agent name = pane label = slug (`<slug>-po` for a PO). Target workers by name, never by sidebar position.
 
 ## Report
 
-Per task: ID, source reference, state, branch, sha, evidence path, human validation needed. Then `Merge order`, `Predicted conflicts` and the blocked list. State plainly that every branch is local and unmerged: `complete` means implemented, not integrated. No worker transcripts.
+Per task: ID, source reference, state, branch, sha, evidence path, human validation needed. Then `Merge order`, `Predicted conflicts`, the blocked list and every open question in full. State plainly that every branch is local and unmerged: `complete` means implemented, not integrated. No worker transcripts.
 
 When the project squash-merges, a chained branch still carries its dependency's original commits after that dependency lands. For each chained task, give the command to run once its dependency is merged:
 

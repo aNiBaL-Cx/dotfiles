@@ -37,8 +37,9 @@ A worker is a pane whose `label` equals a role, or a role plus `-N` (`ui`, `dev-
 | `dev`    | Behavior, data wiring, small pure helpers                                                                    |
 | `test`   | Test files                                                                                                   |
 | `review` | None. Read-only notes on the current diff, when the coordinator asks for a second opinion before integrating |
+| `po`     | The task note's `Scope` and `Acceptance criteria` sections only. Read-only on code                           |
 
-A `-N` suffix shares the parent role. No fifth role unless the user names it.
+A `-N` suffix shares the parent role. No sixth role unless the user names it.
 
 Defaults are a starting point. The prompt names the exact files each pane owns. A component file that mixes markup and behavior goes to one pane. Leave `blocked` or `working` panes alone; a blocked approval is the user's.
 
@@ -58,6 +59,7 @@ Level by role and profile:
 | `ui`, `test` | junior                | junior; mid for complex layout, integration or concurrency | mid     |
 | `dev`        | junior; mid for state | mid; junior for a mechanical edit; senior for state        | senior  |
 | `review`     | mid                   | senior                                                     | staff   |
+| `po`         | mid                   | mid                                                        | senior  |
 
 "State" means the task touches state, concurrency, or data contracts. Staff starts only under `premium` or when the user names it.
 
@@ -69,7 +71,25 @@ Agent name = label; names are unique among live agents, so a second `dev` is `de
 
 Task note: the file the user points at, or the repo's task folder (`docs/tasks/` in repos that have one). Read it, the acceptance criteria, and `git status`. Preserve unrelated dirty files.
 
-Coordinator decides architecture, scope, contracts, and file ownership. One writer per file. Parallel prompts only when file sets do not overlap. Record a decision in the task note before any pane implements on top of it. A test that needs a production export: coordinator assigns that edit to the production owner, or transfers the file to `test` after the owner reports done.
+### Shape first, when criteria are missing
+
+The task note has no acceptance criteria, they are ambiguous, or the user asks for a PO: prompt `po` before any other pane starts. It decides what is built; it writes nothing but the note's `Scope` and `Acceptance criteria` sections. When the project defines its own PO skill or agent, its prompt says to follow that one for research and format.
+
+```text
+Objective: write the scope and acceptance criteria for this task.
+Context: task note path. The user's request, verbatim.
+Ownership: the task note's Scope and Acceptance criteria sections. Code is read-only.
+Out of bounds: architecture, file layout, contracts, trackers (Linear, Jira, GitHub). Draft only; publish nothing.
+Format: in scope, out of scope, then one scenario per criterion with how to verify it. Open questions listed, never guessed.
+Stop: do not implement, commit, or start another task.
+Delivery: the sections written, open questions.
+```
+
+**Gate:** show the user the criteria and open questions, and wait. Workers that implement against criteria nobody approved validate against the PO's guess. Start `ui`, `dev` or `test` only after the user approves; record the approval in the note. Criteria already in the note when the task arrived count as approved. No user to wait for (invoked inside `pingpong` or another unattended loop): do not start `po`; stop with `blocked: no approved acceptance criteria` and let the loop report it.
+
+### Build
+
+The approved note owns scope. Coordinator decides architecture, contracts, and file ownership. One writer per file. Parallel prompts only when file sets do not overlap. Record a decision in the task note before any pane implements on top of it. A test that needs a production export: coordinator assigns that edit to the production owner, or transfers the file to `test` after the owner reports done.
 
 Write each prompt to a temp file outside the repo, then send its contents inline:
 
@@ -85,7 +105,7 @@ Prompt shape:
 Objective:
 Context: task note path and the decided contract. No chat history.
 Ownership: files you may edit.
-Out of bounds: files and behaviors to leave alone. Architecture, scope, and contract choices are the coordinator's: on an unresolved one, pause that part and report evidence.
+Out of bounds: files and behaviors to leave alone. Scope comes from the approved task note; architecture and contract choices are the coordinator's. On an unresolved one, pause that part and report evidence.
 Acceptance: command you must run.
 Stop: do not commit, push, or start another task.
 Delivery: changed files, checks with results, unresolved issues. Keep your context until the coordinator confirms integration.
@@ -94,6 +114,8 @@ Delivery: changed files, checks with results, unresolved issues. Keep your conte
 ## Integrate
 
 Review the diff yourself. Fix a small integration bug in place when explaining it costs more than the edit. Run the repo test and build once on the integrated tree. Write the real result in the task note.
+
+When `po` shaped the task, send it the integrated result for an acceptance pass: per criterion, met or not, with the evidence it read. Read-only; it reports, the coordinator fixes or reports to the user.
 
 Commit only when the user asked. Stage only this task's files. Commit on the branch the user named. Push only when asked.
 
