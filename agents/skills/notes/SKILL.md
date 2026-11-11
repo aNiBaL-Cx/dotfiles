@@ -39,8 +39,8 @@ Task IDs are whatever the project's tracker uses (`TASK-001` below). Which track
 - **The main note is the index.** `<tasks>/<ID>/<ID>-index.md`, always that name. It is the task's collection point: when work started, what the sub-notes hold, what was decided, what changed in scope, who reviewed it, whether QA ran and passed. A folder with a dozen files needs one file you can open without looking.
 - **Link, don't copy.** The tracker owns status, acceptance criteria and discussion. The code host owns the diff. The index owns the development record: reasoning, dead ends, links. If the tracker or the code host can hold it, link it.
 - **Anti-bloat.** No code blocks, curl or file lists in the index; link the PR. A section you cannot scan in 30 seconds goes to a sub-note or gets cut. This holds even with no PR to link: runbooks, console recipes and shell blocks go in `<ID>-runbook.md`, with a one-line pointer from the index.
-- **Folder per task from the start.** Index, sub-notes and artifacts (handoffs, test results) live in `<ID>/`. Never promote a flat note to a folder later: it breaks links and makes duplicates.
-- **ID in every note name.** Sub-notes are `<ID>-<what>.md`: `TASK-001-investigation.md`, `TASK-001-qa-plan.md`, `TASK-001-handoff.md`. A note must be identifiable from its filename alone.
+- **Folder per task from the start.** Index, sub-notes and artifacts (test results) live in `<ID>/`. Never promote a flat note to a folder later: it breaks links and makes duplicates.
+- **ID in every note name.** Sub-notes are `<ID>-<what>.md`: `TASK-001-investigation.md`, `TASK-001-qa-plan.md`. A note must be identifiable from its filename alone.
 - **Older notes stay put.** Notes named before a convention keep their name until archived. Renaming outside Obsidian breaks wikilinks.
 - **Frontmatter:** `tags: ticket`, unless the vault says otherwise.
 - **Register.** Match the voice and density of the vault's exemplar note when it has one.
@@ -49,7 +49,7 @@ Task IDs are whatever the project's tracker uses (`TASK-001` below). Which track
 
 Several agents and sessions touch one task. The index is where they meet: it is fresher than any transcript and it is the only shared state.
 
-- **Read the index first**, before the code and the conversation. Then `<ID>-handoff.md` if present: one per task, rewritten in place, possibly fresher still.
+- **Read the index first**, before the code and the conversation. Then `.handoff/<ID>.md` at the worktree root if present: the `handoff` skill's transient resume state, possibly fresher still. It never lives in the vault.
 - **Write back before you finish.** Append one dated line to the section that is yours (`Review`, `QA`, `Scope changes`, `Interactions`) and update `**Status:**` so it is still true.
 - **Never rewrite another agent's line.** Add a dated line that supersedes it and say what changed.
 - **Conclusions in the index, evidence in the sub-note.** File:line goes to `<ID>-investigation.md`. Screenshots and per-scenario results go to `test_results/`, which is disposable: deleted at archive, and nothing outside it links to its files. Each QA run is one or two lines in the index's `QA` section: date, environment, build, counts.
@@ -62,7 +62,7 @@ Several agents and sessions touch one task. The index is where they meet: it is 
 - **The four bold lines are one line each.** A `**Status:**` paragraph is the failure this guards against: one ran to 1,900 characters holding PR state, two QA runs and another task's finding, and was stale on two counts because no single line could be updated. `**Status:**` names the tracker state and where the code is (uncommitted / pushed / in review); "implemented" with no PR is the drift it prevents. `**Next action:**` is one verb phrase. `**Blocked on:**` is "nothing", or what and whose.
 - **`Decisions` are one-liners:** the choice, the rejected alternative, and a link to the PR that holds the why. The PR body is the source of the reasoning, because it survives a squash merge and reviewers have no vault. Never copy its paragraphs back. No PR yet → link the investigation sub-note.
 - **`Review` and `QA` stay even when empty**, as `**not reviewed**` / `**not run**`. The absence is the signal.
-- `Sub-notes` is the folder's table of contents: one line per companion file, plus one shared unlinked line for disposable artifacts (handoff, `test_results/`).
+- `Sub-notes` is the folder's table of contents: one line per companion file, plus one shared unlinked line for disposable artifacts (`test_results/`).
 - Add `Scope changes`, `Notes`, `Gotchas` or `Manual testing` only when there is something for them. `Scope changes` is dated: what changed, who asked, the effect on acceptance criteria or estimate.
 - The process timeline goes to the tracker as comments, not the note.
 
@@ -70,7 +70,7 @@ Several agents and sessions touch one task. The index is where they meet: it is 
 
 - **State**: read many times, rewritten, must be true now. The daily note, the index's four bold lines. Glanceable, no history, link instead of repeating.
 - **Record**: append-only, read once later by someone with a question. PR body, `Decisions`, `Interactions`, investigation, meeting notes. Detail is fine. Repeat only where the reader cannot reach the other source: the PR repeats the vault (reviewers have no vault); the vault never repeats the PR.
-- **Transfer**: read once by one reader in the next 30 minutes, then dead. `<ID>-handoff.md`: state, the next three actions, traps, 40 lines at most, one file overwritten in place.
+- **Transfer**: read once by one reader in the next 30 minutes, then dead. Not a vault note: the `handoff` skill writes it to `.handoff/<ID>.md` in the worktree. Anything still valuable once it is no longer "now" moves to the index or a sub-note.
 
 ## Operations
 
@@ -93,14 +93,14 @@ Only when a section of the index overflows the 30-second scan, or deep research 
 
 ### Resume a task
 
-Read `<ID>-index.md` and summarize: status, next action, blockers, whether it was reviewed and QA'd. Read `<ID>-handoff.md` if present for the exact resume state, and rewrite that file (never a second one) when you stop. Continue in the same index.
+Read `<ID>-index.md` and summarize: status, next action, blockers, whether it was reviewed and QA'd. Read `.handoff/<ID>.md` in the worktree if present for the exact resume state; when you stop mid-step, rewrite it with the `handoff` skill. Continue in the same index.
 
 ### Archive a task
 
 When the tracker says done:
 
 1. Run the vault's close-out process first, if the vault's agent instructions name one. Nothing in the index is rewritten or trimmed at archive time; it is the record as it stands.
-2. Delete `<ID>-handoff.md` and `test_results/` if still there.
+2. Delete `test_results/`, and any legacy `<ID>-handoff*.md`, if still there.
 3. Move the folder to `<archive>`, at the path the vault's README or agent instructions give (default: same path as under `<tasks>`). Move it in Obsidian so links update.
 
 ### Link in the daily note

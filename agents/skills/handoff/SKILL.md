@@ -1,18 +1,18 @@
 ---
-name: local-handoff
-description: "Rewrite a handoff file in the repo's local .handoff/ folder so another agent or a future session can continue with zero context. One file per piece of work, .handoff/<slug>.md at the repo root, overwritten in place. Never writes to the notes vault. Use when: local handoff, handoff to .handoff, hand off here, pass to next agent, save context, continue later."
+name: handoff
+description: "Rewrite a handoff file in the repo's local .handoff/ folder so another agent or a future session can continue with zero context. One file per piece of work, .handoff/<slug>.md at the repo root, overwritten in place. Never writes to the notes vault. Use when: handoff, local handoff, hand off, hand off here, pass to next agent, save context, continue later, pick up later."
 ---
 
-# Local handoff
+# Handoff
 
 A transfer note: read once, by one reader, soon, then dead. It holds the state now, the next three actions, and the traps. Everything else is a link.
 
-**Announce at start:** "I'm using the local-handoff skill."
+**Announce at start:** "I'm using the handoff skill."
 
 ## Usage
 
-- `/local-handoff` - rewrite the handoff for the current work
-- `/local-handoff <description>` - same, with a specific focus
+- `/handoff` - rewrite the handoff for the current work
+- `/handoff <description>` - same, with a specific focus
 
 ## One file, overwritten
 
@@ -61,8 +61,8 @@ A transfer note: read once, by one reader, soon, then dead. It holds the state n
 
 ## What does NOT go here
 
-- Decisions and why: PR body.
-- What was done: git log.
+- Decisions and why: PR body, and the ticket index in the notes vault when the work has one.
+- What was done: git log, and the index's `Interactions`.
 - Inventories, script outputs, test matrices: a separate file next to it in `.handoff/`, linked from `Links`.
 
 ## Rules
