@@ -123,6 +123,12 @@ those are symlinked in from elsewhere. Skills that are not tied to one vault liv
 in `agents/skills/`; each is linked per-dir into both `~/.claude/skills/` and
 `~/.agents/skills/` (Codex/Copilot/Gemini read the latter).
 
+For projects that need real files instead of symlinks, list target dirs (one per
+line, `~` ok, `#` comments) in `agents/skills-copy.local` (gitignored), e.g.
+`~/projects/foo/.claude/skills`. Each `install.sh` run overwrites those copies.
+A skill removed from `agents/skills/` stays in the copies; delete it there by hand.
+Relative paths and the two symlinked dirs above are skipped.
+
 Third-party skills are not copied here; install them from their own repos, which
 also keeps them updatable (`npx skills update -g`):
 
