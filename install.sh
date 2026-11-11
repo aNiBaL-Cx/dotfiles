@@ -142,7 +142,9 @@ done
 
 # Hard copies for projects that need real files (sandboxed agents, repos that
 # commit their skills). agents/skills-copy.local is gitignored: one target dir
-# per line, ~ allowed, # comments. Each re-run overwrites the copies.
+# per line, ~ allowed, # comments. Only skills the target already has are
+# refreshed; others are neither added nor removed, and files that exist only in
+# the target copy are kept.
 copy_list="$repo/agents/skills-copy.local"
 if [ -f "$copy_list" ]; then
   while IFS= read -r target || [ -n "$target" ]; do
@@ -156,13 +158,16 @@ if [ -f "$copy_list" ]; then
       "$HOME/.claude/skills"|"$HOME/.agents/skills"|[!/]*)
         echo "skipped $target (relative, or one of the symlinked skills dirs)"; continue ;;
     esac
-    mkdir -p "$target"
+    [ -d "$target" ] || { echo "skipped $target (no such directory)"; continue; }
+    updated=0
     for d in "$repo"/agents/skills/*/; do
       name="$(basename "$d")"
+      [ -d "$target/$name" ] || continue
       [ -L "$target/$name" ] && rm "$target/$name"
-      rsync -a --delete "$d" "$target/$name/"
+      rsync -a "$d" "$target/$name/"
+      updated=$((updated + 1))
     done
-    echo "copied skills into $target"
+    echo "updated $updated skills in $target"
   done < "$copy_list"
 fi
 

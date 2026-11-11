@@ -125,9 +125,10 @@ in `agents/skills/`; each is linked per-dir into both `~/.claude/skills/` and
 
 For projects that need real files instead of symlinks, list target dirs (one per
 line, `~` ok, `#` comments) in `agents/skills-copy.local` (gitignored), e.g.
-`~/projects/foo/.claude/skills`. Each `install.sh` run overwrites those copies.
-A skill removed from `agents/skills/` stays in the copies; delete it there by hand.
-Relative paths and the two symlinked dirs above are skipped.
+`~/projects/foo/.claude/skills`. Each `install.sh` run refreshes only the skills
+that dir already has: no skill is added or removed, and files that exist only in
+the target copy are kept. To start tracking a skill there, copy it in once by hand.
+Missing dirs, relative paths and the two symlinked dirs above are skipped.
 
 Third-party skills are not copied here; install them from their own repos, which
 also keeps them updatable (`npx skills update -g`):
