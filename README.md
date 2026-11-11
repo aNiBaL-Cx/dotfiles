@@ -127,7 +127,8 @@ For projects that need real files instead of symlinks, list target dirs (one per
 line, `~` ok, `#` comments) in `agents/skills-copy.local` (gitignored), e.g.
 `~/projects/foo/.claude/skills`. Each `install.sh` run refreshes only the skills
 that dir already has: no skill is added or removed, and files that exist only in
-the target copy are kept. To start tracking a skill there, copy it in once by hand.
+the target copy are kept. `SKILLS_COPY_ADD=1 ./install.sh` also adds the repo
+skills a target lacks; it still removes nothing.
 Missing dirs, relative paths and the two symlinked dirs above are skipped.
 
 Third-party skills are not copied here; install them from their own repos, which

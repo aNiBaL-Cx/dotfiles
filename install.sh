@@ -143,8 +143,8 @@ done
 # Hard copies for projects that need real files (sandboxed agents, repos that
 # commit their skills). agents/skills-copy.local is gitignored: one target dir
 # per line, ~ allowed, # comments. Only skills the target already has are
-# refreshed; others are neither added nor removed, and files that exist only in
-# the target copy are kept.
+# refreshed; SKILLS_COPY_ADD=1 also adds the repo skills it lacks. Nothing is
+# ever removed, and files that exist only in the target copy are kept.
 copy_list="$repo/agents/skills-copy.local"
 if [ -f "$copy_list" ]; then
   while IFS= read -r target || [ -n "$target" ]; do
@@ -159,15 +159,20 @@ if [ -f "$copy_list" ]; then
         echo "skipped $target (relative, or one of the symlinked skills dirs)"; continue ;;
     esac
     [ -d "$target" ] || { echo "skipped $target (no such directory)"; continue; }
-    updated=0
+    updated=0; added=0
     for d in "$repo"/agents/skills/*/; do
       name="$(basename "$d")"
-      [ -d "$target/$name" ] || continue
+      if [ -d "$target/$name" ]; then
+        updated=$((updated + 1))
+      elif [ "${SKILLS_COPY_ADD:-0}" = 1 ]; then
+        added=$((added + 1))
+      else
+        continue
+      fi
       [ -L "$target/$name" ] && rm "$target/$name"
       rsync -a "$d" "$target/$name/"
-      updated=$((updated + 1))
     done
-    echo "updated $updated skills in $target"
+    echo "updated $updated, added $added skills in $target"
   done < "$copy_list"
 fi
 
