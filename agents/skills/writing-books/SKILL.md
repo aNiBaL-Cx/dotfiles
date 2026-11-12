@@ -31,11 +31,31 @@ Genre defaults (override when the theme asks for it):
 | Romance | Two clear wants in conflict; dialogue carries the tension |
 | Fantasy / sci-fi | One rule of the world at a time, shown in use; no glossary dumps |
 | Humour / satire | Narrator's irony; precise absurd detail; never laughs at its own joke |
-| Children 4–6 | Read-aloud rhythm, repetition, sound words, one feeling per page, no stated moral |
-| Middle grade / YA | Protagonist's age is the narrator's age; fast scenes; real stakes |
+| Children 0–12 | See Children's books below |
+| YA | Protagonist's age is the narrator's age; fast scenes; real stakes |
 | Memoir | Honest first person; the older narrator's view only where it adds meaning |
 
 **In the style of an author:** list four or five traits first (narrator stance, sentence shape, vocabulary, humour, typical targets) and write from the traits. For an author still under copyright, imitate the traits only. Never reproduce sentences from any author.
+
+## Children's books
+
+Pick the band from the reader's age, then follow its shape:
+
+| Age | Form | Length | Shape |
+|-----|------|--------|-------|
+| 0–3 | Board book | 10–100 words, 5–8 spreads | One word or line per page; names, sounds, routines; no plot needed |
+| 3–6 | Picture book | 300–600 words, 12–14 spreads | Read aloud by an adult; repetition and a refrain; the page turn is the suspense; one feeling per spread |
+| 6–8 | Early reader | 1,000–2,500 words, short chapters | The child reads alone: short sentences, familiar words, one new word per page at most; much dialogue |
+| 7–10 | Chapter book | 6,000–15,000 words, chapters of 800–1,500 | Protagonist a year or two older than the reader; each chapter ends on a question or a turn; light humour; real but safe stakes |
+| 9–12 | Middle grade | 25,000–50,000 words | Close first or third person at the hero's age; the child solves the problem, not an adult |
+
+**Picture book manuscript:** spread by spread. Each spread has `Texto:` and, only when the image must show what the text does not say, `[Ilustração: …]`. The text and the image split the story: never describe in words what the picture shows. Add a short character and setting sheet for the illustrator, and keep every object in the spreads consistent with it.
+
+**For every band:**
+- The child acts and solves. A helper may show the way, never solve it.
+- No stated lesson. The ending shows the change in an action ("ronronou com ela"), not in a sentence about what the hero learned.
+- Fear and sadness are allowed and respected, then resolved.
+- Read the text aloud in your head. Cut every phrase that trips the tongue.
 
 ## 3. Book-length work
 
@@ -54,6 +74,8 @@ Reread the text and remove these AI habits. Each one appears in untested drafts:
 - **Tense drift:** "batiam… tamborilam". One tense per scene.
 - **Orthography or variant mix:** pt-PT and pt-BR, pre- and post-1990 spelling.
 - **Stated emotion:** "sentiu medo". Show the body or the action instead.
+- **pt-PT dialogue:** new line with a travessão (`— Entrem!`), not quotation marks. Keep each character's form of address: cousins use "tu" ("Estás a ver?"), never slip to "você" forms.
+- **Objects out of nowhere:** a lemon tree in spread 9 that the setting sheet never had. Check names, objects and ages against the sheet or `bible.md`.
 
 ## Output
 
