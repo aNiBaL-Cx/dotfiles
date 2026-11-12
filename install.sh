@@ -224,16 +224,25 @@ if [ ! -d "$repo/chrome/node_modules" ]; then
   fi
 fi
 
-# Obsidian keeps hotkeys per vault, in <vault>/.obsidian/hotkeys.json. Copied, not
+# Obsidian keeps hotkeys per vault, in <vault>/.obsidian/hotkeys.json. Merged, not
 # linked: a symlink target outside the vault breaks on other machines and under
-# MEGA sync. Vaults come from Obsidian's own registry, so re-run after adding one.
+# MEGA sync. The repo's commands win; commands bound only in the vault are kept.
+# Vaults come from Obsidian's own registry, so re-run after adding one.
 obsidian_registry="$HOME/Library/Application Support/obsidian/obsidian.json"
 if [ -f "$obsidian_registry" ] && command -v python3 >/dev/null 2>&1; then
   python3 -c 'import json,sys; [print(v["path"]) for v in json.load(open(sys.argv[1]))["vaults"].values()]' "$obsidian_registry" |
   while IFS= read -r vault; do
     [ -d "$vault/.obsidian" ] || continue
-    cp "$repo/obsidian/hotkeys.json" "$vault/.obsidian/hotkeys.json"
-    echo "copied hotkeys.json to $vault"
+    python3 -c '
+import json, os, sys
+src, dst = sys.argv[1], sys.argv[2]
+merged = json.load(open(dst)) if os.path.exists(dst) else {}
+merged.update(json.load(open(src)))
+with open(dst, "w") as f:
+    json.dump(merged, f, indent=2)
+    f.write("\n")
+' "$repo/obsidian/hotkeys.json" "$vault/.obsidian/hotkeys.json"
+    echo "merged hotkeys.json into $vault"
   done
 else
   echo "skipped Obsidian hotkeys (no vault registry or python3)"
