@@ -1,6 +1,6 @@
 ---
 name: writing-well
-description: Use when writing, rewriting, editing or reviewing prose meant for a human reader — notes, documents, tutorials, guides, articles, book chapters, emails, READMEs. Triggers on "improve this text", "rewrite", "edit this", "review my writing", "melhora este texto", "revê a escrita", "escreve um capítulo/tutorial", "/writing-well". Not for code comments or commit messages.
+description: Use when writing, rewriting, editing or reviewing prose meant for a human reader — notes, documents, tutorials, guides, articles, book chapters, emails, READMEs, Linear/GitHub issue descriptions, PR descriptions. Triggers on "improve this text", "rewrite", "edit this", "review my writing", "write the issue", "PR description", "melhora este texto", "revê a escrita", "escreve a issue", "descrição do PR", "escreve um capítulo/tutorial", "/writing-well". Not for code comments or commit messages.
 ---
 
 # Writing well
@@ -17,6 +17,22 @@ Name the reader in one line before writing. Then pick the mode:
 | **Doc / guide** | Find and use one fact | Headings that answer questions, one topic per section, examples next to the rule |
 | **Tutorial** | Learn by doing | Goal, then numbered steps; each step = one action + expected result; runnable examples; "you" voice |
 | **Long-form** (article, book chapter, essay) | Follow an argument | Paragraphs, not bullets; one claim per paragraph, opening with it; transitions carry the logic; vary sentence length; concrete scenes and examples over abstraction |
+| **Issue** (Linear, GitHub) | Pick up work that does not exist yet | See Issue and PR below |
+| **PR description** | Review the change now; understand it later from `git blame` | See Issue and PR below |
+
+### Issue and PR
+
+**The project's conventions win.** A team writes issues and PRs the same way only if everyone follows the repo, not a personal skill. Before writing, look for them and follow them exactly:
+- Loaded instructions and rules (`CLAUDE.md`, `AGENTS.md`, `.claude/rules/*`, e.g. a `linear.md` or `git.md`).
+- A project skill for the job (e.g. `pr`, `linear`). If one exists, use it for shape and tooling; this skill only adds the fidelity rules.
+- `.github/pull_request_template.md`, unless a project rule or skill says to ignore it.
+
+Fallback shape, only when the project defines none:
+
+- **Issue:** concise noun-phrase title. A short lead paragraph in plain language: what happens, why, what to do, readable without opening a file. Then `### Technical details` as bullets with the evidence (file, line, endpoint, behaviour, decision + rejected alternative), cited from the base branch. Then `### Acceptance criteria` grouped by `**Scenario: <name>**` with `- Actual:` (verified current behaviour) and `- Expected:`. One issue = one deliverable = one PR.
+- **PR:** two or three short paragraphs in product language (one for a small fix): what changes, why, what is out of scope. Then `Key decisions:` with two to four bullets, each a choice a reviewer would question plus the alternative it beat. A screenshot when there is UI. No file lists, changelogs or story of how it was found: the diff and the issue hold those. It must stand alone: reviewers have no access to your notes.
+
+Both: plain words, no LLM-speak ("crucial", "robust", "leverages", "ensures"), no em dashes, no wikilinks, paths only in the technical bullets.
 
 Long-form breaks note rules on purpose: no fragments, few bullets, rhythm matters. Keep the cuts (filler, hedging, passive voice) and keep one idea per paragraph.
 
@@ -52,3 +68,8 @@ For a review without a rewrite: list problems as `quote → problem → fix`, wo
 | Invented done-criteria, examples or benefits | `[?]` or `[suggested]` |
 | Hedge removed together with real uncertainty | Keep doubt once, explicitly |
 | Short intro inflated into a full article | Match the source length unless asked to expand |
+| Issue or PR written from this skill while the repo has its own rules | Repo rules and skills first |
+| Issue opens with the solution | Lead with what happens and why |
+| "Actual" written from assumption | Verify current behaviour, or mark `[?]` |
+| Lead states as fact a cause the details call "not confirmed" | Same certainty everywhere the claim appears |
+| Empty sections flagged as gaps ("rejected alternative: none") | Omit the line |
