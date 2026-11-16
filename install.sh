@@ -129,7 +129,7 @@ for home in "$HOME"/.codex*/; do
   fi
   # Codex's own footer: the hook above only feeds tmux, so outside tmux (Herdr)
   # this is the line you see. An existing status_line is left as it is.
-  status_line='status_line = ["model-with-reasoning", "context-used", "five-hour-limit", "weekly-limit"]'
+  status_line='status_line = ["model-with-reasoning", "used-tokens", "context-window-size", "five-hour-limit", "weekly-limit"]'
   if ! grep -q '^status_line' "$home/config.toml"; then
     if grep -q '^\[tui\]' "$home/config.toml"; then
       awk -v line="$status_line" '{ print } /^\[tui\]$/ { print line }' "$home/config.toml" > "$home/config.toml.tmp" \
