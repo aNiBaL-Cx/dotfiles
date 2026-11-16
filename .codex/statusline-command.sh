@@ -17,9 +17,14 @@ tokens=$(grep '"type":"token_count"' "$transcript" | tail -1)
 jq -n --argjson turn "${turn:-null}" --argjson tokens "$tokens" '
   $tokens.payload.info as $info
   | [$tokens.payload.rate_limits.primary, $tokens.payload.rate_limits.secondary | select(. != null)] as $limits
-  | def used($minutes): [$limits[] | select(.window_minutes == $minutes) | .used_percent] | first;
+  | def limit($minutes): [$limits[] | select(.window_minutes == $minutes)] | first
+      | {used_percentage: .used_percent?, resets_at: .resets_at?};
   {
     model: {display_name: ($turn.payload.model // "codex")},
-    context_window: {used_percentage: (if $info then $info.last_token_usage.total_tokens * 100 / $info.model_context_window else 0 end)},
-    rate_limits: {five_hour: {used_percentage: used(300)}, seven_day: {used_percentage: used(10080)}}
+    context_window: (if $info then {
+      used_percentage: ($info.last_token_usage.total_tokens * 100 / $info.model_context_window),
+      context_window_size: $info.model_context_window,
+      current_usage: {input_tokens: $info.last_token_usage.total_tokens, cache_creation_input_tokens: 0, cache_read_input_tokens: 0}
+    } else {used_percentage: 0} end),
+    rate_limits: {five_hour: limit(300), seven_day: limit(10080)}
   }' | "$HOME/.claude/statusline-command.sh" >/dev/null
