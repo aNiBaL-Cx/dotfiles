@@ -69,6 +69,20 @@ chmod +x "$repo/.claude/statusline-command.sh"
 ln -sfn "$repo/.claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
 ln -sfn "$repo/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 echo "linked ~/.claude/statusline-command.sh ~/.claude/CLAUDE.md"
+# Global agent instructions: agents/AGENTS.md is the one copy. Claude Code's
+# CLAUDE.md imports it from ~/.agents/AGENTS.md; each ~/.codex* home reads its
+# own AGENTS.md. An existing real file is skipped, not overwritten.
+mkdir -p "$HOME/.agents"
+for dir in "$HOME/.agents" "$HOME"/.codex*/; do
+  [ -d "$dir" ] || continue  # no ~/.codex* home: the glob stays literal
+  target="${dir%/}/AGENTS.md"
+  if [ -e "$target" ] && [ ! -L "$target" ]; then
+    echo "skipped $target (existing file — merge it into agents/AGENTS.md first)"
+  else
+    ln -sfn "$repo/agents/AGENTS.md" "$target"
+    echo "linked $target"
+  fi
+done
 
 # Codex: no statusLine hook, so Stop/PostToolUse hooks rebuild the same line from
 # the session rollout. hooks.json is shared with herdr and caveman, so merge the

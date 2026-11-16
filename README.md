@@ -93,7 +93,9 @@ git clone https://github.com/aNiBaL-Cx/dotfiles ~/projects/dotfiles
 Symlinks `tmux/tmux.conf` → `~/.tmux.conf`, each script into
 `~/.config/tmux/scripts/` (per-file, so local-only scripts can coexist),
 `.claude/hooks/*` + `.claude/statusline-command.sh` + `.claude/CLAUDE.md` into
-`~/.claude/`, `.codex/statusline-command.sh` into `~/.codex/`,
+`~/.claude/`, `.codex/statusline-command.sh` into `~/.codex/`, `agents/AGENTS.md`
+(global agent instructions, imported by `CLAUDE.md`) into `~/.agents/` and every
+`~/.codex*/`,
 `nvim/` → `~/.config/nvim` (whole dir; an existing real directory is skipped —
 move it aside first), `zsh/*` → `~/.zshrc`, `~/.zprofile`, `~/.zshenv`,
 `~/.aliases`, `chrome/chrome-tab-groups` → `~/.local/bin/`,
