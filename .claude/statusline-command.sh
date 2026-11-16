@@ -25,7 +25,7 @@ IFS=$'\x1f' read -r model ctx tokens usage_5h usage_7d agent < <(echo "$input" |
      // ($pct * $size / 100)) as $used
   | [ (.model.display_name // "" | sub(" \\(.*"; "")),
       ($pct | tostring),
-      (if $size > 0 then "\($used | short)/\($size | short)" else "\($pct)%" end),
+      (if $size > 0 then "\($used | short)/\($size | short) \($pct)%" else "\($pct)%" end),
       (.rate_limits.five_hour // {} | limit("5h")),
       (.rate_limits.seven_day // {} | limit("7d")),
       (.agent.name // "") ]
