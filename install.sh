@@ -113,6 +113,18 @@ for home in "$HOME"/.codex*/; do
   elif ! grep -q '^hooks = true' "$home/config.toml"; then
     echo "warning: add 'hooks = true' under [features] in $home/config.toml"
   fi
+  # Codex's own footer: the hook above only feeds tmux, so outside tmux (Herdr)
+  # this is the line you see. An existing status_line is left as it is.
+  status_line='status_line = ["model-with-reasoning", "context-used", "five-hour-limit", "weekly-limit"]'
+  if ! grep -q '^status_line' "$home/config.toml"; then
+    if grep -q '^\[tui\]' "$home/config.toml"; then
+      awk -v line="$status_line" '{ print } /^\[tui\]$/ { print line }' "$home/config.toml" > "$home/config.toml.tmp" \
+        && mv "$home/config.toml.tmp" "$home/config.toml"
+    else
+      printf '\n[tui]\n%s\n' "$status_line" >> "$home/config.toml"
+    fi
+    echo "added the Codex status_line to $home/config.toml"
+  fi
   echo "hooked $cmd (Stop + PostToolUse) and herdr-pane-name.sh (SessionStart) in $hooks"
 done
 
