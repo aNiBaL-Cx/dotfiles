@@ -176,6 +176,13 @@ itself when unavailable. It never touches your real tmux server.
 - `fzf`, `nvim` (annotation buffer / pickers)
 - node (any recent version) for `chrome-tab-groups` only — resolved via
   `$CHROME_TAB_GROUPS_NODE`, `PATH`, then the newest nvm install
+- `terminal-notifier` (optional, `brew install terminal-notifier`) for agent
+  banners whose click jumps to the agent's window. Without it, or when it fails,
+  `notify-push.sh` falls back to `osascript`, whose banners open Script Editor
+  when clicked. Allow it in System Settings > Notifications; while notifications
+  are off it exits 3 and every banner takes the fallback. If a Ruby gem of the
+  same name comes first in `PATH`, set
+  `NOTIFY_NOTIFIER=/opt/homebrew/bin/terminal-notifier` in `~/.claude/notify.conf`.
 
 ## Credits
 
