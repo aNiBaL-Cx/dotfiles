@@ -63,6 +63,14 @@ if [ -f "$stamp" ]; then
 fi
 printf '%s' "$now" > "$stamp"
 
+# Fallback banner: no click action possible, and clicking opens Script Editor.
+osascript_notify() {
+  command -v osascript >/dev/null 2>&1 || return 0
+  esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+  osascript -e "display notification \"$(esc "$message")\" with title \"$(esc "$title")\"" \
+    >/dev/null 2>&1 || true
+}
+
 if [ "$NOTIFY_LOCAL" = 1 ]; then
   notifier="${NOTIFY_NOTIFIER:-$(command -v terminal-notifier 2>/dev/null)}"
   jumper="${NOTIFY_JUMPER:-$HOME/.config/tmux/scripts/tmux-agent-jump}"
@@ -84,13 +92,11 @@ if [ "$NOTIFY_LOCAL" = 1 ]; then
       set -- "$@" -activate "$NOTIFY_TERMINAL_APP"
     fi
     # Backgrounded anyway: a notifier that blocks must never be able to stall the
-    # hook. Nothing here depends on its exit status.
-    "$notifier" "$@" >/dev/null 2>&1 &
-  elif command -v osascript >/dev/null 2>&1; then
-    # Fallback: no click action possible, and clicking opens Script Editor.
-    esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
-    osascript -e "display notification \"$(esc "$message")\" with title \"$(esc "$title")\"" \
-      >/dev/null 2>&1 || true
+    # hook. A failure (e.g. exit 3 when macOS has notifications turned off for
+    # terminal-notifier) falls back to osascript inside the same background job.
+    ( "$notifier" "$@" >/dev/null 2>&1 || osascript_notify ) &
+  else
+    osascript_notify
   fi
 fi
 
