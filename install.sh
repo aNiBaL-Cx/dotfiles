@@ -157,6 +157,14 @@ if [ -d "$HOME/.grok" ]; then
   mkdir -p "$HOME/.grok/hooks"
   printf '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"%s grok","timeout":10}]}]}}\n' "$pane_name" > "$HOME/.grok/hooks/pane-name.json"
   echo "wrote ~/.grok/hooks/pane-name.json"
+  # Grok's status line takes a command (off by default). An existing
+  # [ui.status_line] is left as it is.
+  chmod +x "$repo/.grok/statusline-command.sh"
+  ln -sfn "$repo/.grok/statusline-command.sh" "$HOME/.grok/statusline-command.sh"
+  if ! grep -q '^\[ui\.status_line\]' "$HOME/.grok/config.toml" 2>/dev/null; then
+    printf '\n[ui.status_line]\ntype = "command"\ncommand = "~/.grok/statusline-command.sh"\n' >> "$HOME/.grok/config.toml"
+    echo "added the Grok status_line to ~/.grok/config.toml"
+  fi
 fi
 
 # Agent skills shared by Claude Code (~/.claude/skills) and Codex/Copilot/Gemini
