@@ -33,3 +33,6 @@ key = "prefix+p"
 type = "plugin_action"
 command = "ray.plugin-manager.open"
 description = "open plugin manager"
+
+[experimental]
+kitty_graphics = true
