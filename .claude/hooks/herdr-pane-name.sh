@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-# Names the Herdr agent "<ticket>_<cli>" in a worktree, "<cli>" elsewhere, with a number
-# when the name is taken: sq2-1234_claude, sq2-1234_claude2, task-0a_codex, grok2.
-# Max 18 chars. The pane label gets "<TICKET> <Model>" for the eye: "SQ2-1234 Opus".
+# Names the Herdr agent by level colour: "<ticket>-<colour>" in a worktree, "<colour>"
+# elsewhere, with a number when the name is taken: sq2-1234-green, sq2-1234-blue2, red.
+# The root pane of a worktree workspace is "<ticket>-maestro". Colours follow the levels
+# in agents/skills/references/model-levels.md: staff red, senior green, mid blue, junior
+# grey. A model whose level depends on effort and resolves to no row falls back to the
+# CLI tag: sq2-1234-codex. AGENT_LEVEL=<level|colour> in the env forces the colour.
+# The pane label gets "<TICKET> <Model>" for the eye: "SQ2-1234 Opus".
 # Usage: herdr-pane-name.sh [claude|codex|grok|...] on SessionStart, hook JSON on stdin.
-# Self-check of the naming rule: herdr-pane-name.sh --check
-# Never overwrites a name or label it did not write itself (a role rename like
-# sq2-1234_dev survives /clear and /compact). Forks so the session is not held while it
-# waits for herdr-agent-state.sh to register the agent.
-import json, os, re, subprocess, sys, time
+# Self-check of the naming rules: herdr-pane-name.sh --check
+# Never overwrites a name or label it did not write itself (a name given by the skill that
+# started the agent survives /clear and /compact). Forks so the session is not held while
+# it waits for herdr-agent-state.sh to register the agent.
+import json, os, re, subprocess, sys, time, tomllib
 
 pane = os.environ.get("HERDR_PANE_ID")
 herdr = os.environ.get("HERDR_BIN_PATH", "herdr")
@@ -30,7 +34,96 @@ if cli == "codex" and home.startswith(".codex-") and len(home) > 7:
     tag = "codex" + home[7].lower()
 
 model = str(data.get("model") or "")
-model = next((n for n in ("Opus", "Fable", "Sonnet", "Haiku") if n.lower() in model.lower()), tag.capitalize())
+raw_model = str(data.get("model") or "")
+model = next((n for n in ("Opus", "Fable", "Sonnet", "Haiku") if n.lower() in raw_model.lower()), tag.capitalize())
+
+COLOURS = {"staff": "red", "senior": "green", "mid": "blue", "junior": "grey"}
+CLAUDE = {"fable": "staff", "opus": "senior", "sonnet": "mid", "haiku": "junior"}
+# (model, effort) -> level, main pick then alternative, from model-levels.md. Effort None:
+# the model alone decides. The main pick wins a clash (grok-4.6 xhigh is senior, not the
+# staff alternative).
+LEVELS = {
+    "codex": [
+        ("gpt-6-astra", None, "staff"), ("gpt-6.1-sol", "medium", "senior"),
+        ("gpt-6.1-sol", "low", "mid"), ("gpt-6-luna", None, "junior"),
+        ("gpt-6.1-sol", "high", "staff"), ("gpt-6-sol", "medium", "senior"),
+        ("gpt-5.6-terra", None, "mid"), ("gpt-5.6-luna", None, "junior"),
+    ],
+    "grok": [
+        ("grok-4.7", "medium", "senior"), ("grok-4.7", None, "staff"),
+        ("grok-4.6", "xhigh", "senior"), ("grok-4.6", "medium", "mid"),
+        ("grok-4.5", None, "junior"),
+    ],
+}
+
+
+def level_for(kind, model_id, effort):
+    model_id, effort = (model_id or "").lower(), (effort or "").lower()
+    if kind == "claude":
+        return next((v for k, v in CLAUDE.items() if k in model_id), None)
+    for m, e, level in LEVELS.get(kind, []):
+        if m == model_id and e in (None, effort):
+            return level
+    return None
+
+
+def launch_args(kind):
+    # The CLI process above this hook: its argv carries -m/--model and the effort flags.
+    pid = os.getppid()
+    for _ in range(8):
+        out = subprocess.run(["ps", "-o", "ppid=,args=", "-p", str(pid)], capture_output=True, text=True).stdout.split(None, 1)
+        if len(out) < 2:
+            return []
+        args = out[1].split()
+        if os.path.basename(args[0]).startswith(kind) or any(os.path.basename(a) == kind for a in args[:2]):
+            return args
+        pid = int(out[0])
+    return []
+
+
+def flag(args, *names):
+    for i, a in enumerate(args):
+        for n in names:
+            if a == n and i + 1 < len(args):
+                return args[i + 1]
+            if a.startswith(n + "="):
+                return a.split("=", 1)[1]
+    return None
+
+
+def config(kind):
+    path = {
+        "codex": os.path.join(os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex"), "config.toml"),
+        "grok": os.path.expanduser("~/.grok/config.toml"),
+    }.get(kind)
+    try:
+        c = tomllib.load(open(path, "rb"))
+    except Exception:
+        return None, None
+    if kind == "codex":
+        return c.get("model"), c.get("model_reasoning_effort")
+    return c.get("models", {}).get("default"), c.get("models", {}).get("default_reasoning_effort")
+
+
+def colour_for():
+    forced = os.environ.get("AGENT_LEVEL", "").lower()
+    if forced in COLOURS.values():
+        return forced
+    if forced in COLOURS:
+        return COLOURS[forced]
+    if cli == "claude":
+        level = level_for("claude", raw_model, None)
+    else:
+        args = launch_args(cli)
+        cfg_model, cfg_effort = config(cli)
+        effort = None
+        if cli == "codex":
+            sets = [b for a, b in zip(args, args[1:]) if a in ("-c", "--config")]
+            effort = next((v.split("=", 1)[1].strip("\"'") for v in sets if v.startswith("model_reasoning_effort=")), None)
+        elif cli == "grok":
+            effort = flag(args, "--effort")
+        level = level_for(cli, raw_model or flag(args, "-m", "--model") or cfg_model, effort or cfg_effort)
+    return COLOURS.get(level)
 
 
 def prefix_for(cwd):
@@ -55,8 +148,22 @@ if cli == "--check":
     }.items():
         got = prefix_for(cwd)
         assert got == want, f"{cwd}: {got!r} != {want!r}"
-        name = f"{got}_cursor9" if got else "cursor9"
-        assert len(name) <= 18 and re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", name), name
+        name = f"{got}-maestro9" if got else "maestro9"
+        assert len(name) <= 20 and re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", name), name
+    for kind, m, e, want in [
+        ("claude", "claude-fable-5-1", None, "staff"), ("claude", "claude-opus-5-5[1m]", None, "senior"),
+        ("claude", "claude-sonnet-5-5", None, "mid"), ("claude", "claude-haiku-5-5", None, "junior"),
+        ("codex", "gpt-6-astra", "high", "staff"), ("codex", "gpt-6.1-sol", "medium", "senior"),
+        ("codex", "gpt-6.1-sol", "low", "mid"), ("codex", "gpt-6.1-sol", "xhigh", None),
+        ("codex", "gpt-6-luna", "medium", "junior"), ("grok", "grok-4.7", "high", "staff"),
+        ("grok", "grok-4.7", "medium", "senior"), ("grok", "grok-4.6", "xhigh", "senior"),
+        ("grok", "grok-4.6", "medium", "mid"), ("grok", "grok-4.6", "high", None),
+        ("grok", "grok-4.5", "low", "junior"),
+    ]:
+        got = level_for(kind, m, e)
+        assert got == want, f"{kind} {m} {e}: {got!r} != {want!r}"
+    assert flag(["codex", "-m", "gpt-6-astra"], "-m", "--model") == "gpt-6-astra"
+    assert flag(["grok", "--effort=low"], "--effort") == "low"
     print("ok")
     sys.exit(0)
 
@@ -70,7 +177,14 @@ def run(*args):
 
 
 prefix = prefix_for(str(data.get("cwd") or os.getcwd()))
-base = f"{prefix}_{tag}" if prefix else tag
+# Both before the fork: launch_args walks up from this process's parent.
+root = False
+if prefix:
+    ws = run("pane", "get", pane).get("pane", {}).get("workspace_id")
+    panes = run("pane", "list", "--workspace", ws).get("panes", []) if ws else []
+    root = bool(panes) and panes[0].get("pane_id") == pane
+word = "maestro" if root else colour_for() or tag
+base = f"{prefix}-{word}" if prefix else word
 
 state_file = f"/tmp/herdr-pane-name-{pane.replace(':', '_')}.json"
 try:

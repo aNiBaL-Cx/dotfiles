@@ -13,6 +13,15 @@ Args after `--`, per level and kind:
 | mid    | `--model claude-sonnet-5-5` | `-m gpt-6.1-sol -c model_reasoning_effort=low`    | `-m grok-4.6 --effort medium` |
 | junior | `--model claude-haiku-5-5`  | `-m gpt-6-luna`                                   | `-m grok-4.5 --effort low`    |
 
+## Agent names
+
+Every agent a skill starts is named `<ticket>-<colour>`, the colour of the level it runs at: staff `red`, senior `green`, mid `blue`, junior `grey`. Examples: `sq2-2514-green`, `sq2-2514-blue2` for a second mid agent. The root pane of the ticket's workspace is `<ticket>-maestro`, whatever its level. `<ticket>` is the lowercase ticket ID (`sq2-2514`); with no ticket, the name is the colour alone.
+
+- The colour follows the model that actually runs: a staff agent restarted on senior after a refusal is renamed `green`.
+- Pass the name to `herdr agent start <name>`. The `herdr-pane-name.sh` SessionStart hook never overwrites a name it did not write.
+- An agent started by hand gets its name from that hook, which reads the model and effort from the launch flags, then from the CLI config. `AGENT_LEVEL=<level>` in the env forces the colour.
+- A model and effort pair in neither table below gets the CLI tag instead of a colour: `sq2-2514-codex`.
+
 ## Rules
 
 - Pass every arg in the row: full Claude IDs, because aliases drift on new releases; explicit grok effort, because grok defaults to `high`.

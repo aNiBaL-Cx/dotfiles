@@ -51,7 +51,8 @@ for p in .worktrees/ .handoff/; do grep -qx "$p" "$ex" || echo "$p" >> "$ex"; do
    - Markdown checklist: `<file>:<line>` of the item;
    - pasted text: `pasted:<position>`.
 5. Names derived from the ID, used everywhere below:
-   - `<slug>`: the ID lowercased, `task-001`. Agent name = pane label = evidence directory name.
+   - `<slug>`: the ID lowercased, `task-001`. Pane label = evidence directory name.
+   - `<agent>`: `<slug>-<colour>`, the colour of the worker's level (`../references/model-levels.md`, Agent names): `task-001-blue`. A worker restarted on another level is renamed to the new colour.
    - `<branch>`: `task/<run>/<slug>`, e.g. `task/2026-10-27/task-001`.
    - `<wt>`: `<repo root>/.worktrees/<run>/<slug>`.
 6. Edges, two kinds, written with task IDs:
@@ -113,11 +114,11 @@ A dependent worktree is created only after every dependency is `implemented`, ne
 herdr agent get "$HERDR_PANE_ID"                                              # coordinator kind
 herdr pane split --current --direction right --cwd "<wt>" --no-focus          # id in .result.pane.pane_id
 herdr pane rename <pane_id> <slug>
-herdr agent start <slug> --kind <kind> --pane <pane_id> -- <model args>
-herdr agent prompt <slug> "$(cat /abs/tmp/prompt-<run>-<slug>.md)"           # no --wait
+herdr agent start <agent> --kind <kind> --pane <pane_id> -- <model args>
+herdr agent prompt <agent> "$(cat /abs/tmp/prompt-<run>-<slug>.md)"           # no --wait
 ```
 
-A live agent already holds `<slug>` (another run): stop and ask; never target an agent this run did not start.
+A live agent already holds `<agent>` (another run): stop and ask; never target an agent this run did not start.
 
 Worker level: senior when the task touches state, concurrency or data contracts; junior for a mechanical edit; otherwise by `--profile`: `cheap` junior, `standard` mid, `premium` senior. Args for that level and the coordinator's kind: `../references/model-levels.md`. A model the user names wins.
 
@@ -126,8 +127,8 @@ Worker level: senior when the task touches state, concurrency or data contracts;
 Waiting, round-robin over running workers with a short timeout, so a worker that finishes first is not stuck behind one still working:
 
 ```bash
-herdr agent wait <slug> --timeout 60000        # timeout: next worker, come back later
-herdr agent read <slug> --source recent-unwrapped   # on idle or done: the delivery
+herdr agent wait <agent> --timeout 60000        # timeout: next worker, come back later
+herdr agent read <agent> --source recent-unwrapped   # on idle or done: the delivery
 ```
 
 `blocked`: record it and move on. No worker settled after a full round: wait again. Nothing to wait on and nothing ready to start: Stops.
@@ -217,7 +218,7 @@ On each worker delivery:
 
 Loop until no task is `pending`, `pending human`, `pending criteria`, `waiting`, `running` or `in review`.
 
-Herdr: after recording a delivery, send that worker its kind's compact command from `../references/model-levels.md` (`herdr agent prompt <slug> "<compact>" --wait --timeout 120000`) and leave the pane open. Close panes only when the user asks.
+Herdr: after recording a delivery, send that worker its kind's compact command from `../references/model-levels.md` (`herdr agent prompt <agent> "<compact>" --wait --timeout 120000`) and leave the pane open. Close panes only when the user asks.
 
 ## State file
 
@@ -270,7 +271,7 @@ A `pending criteria` task with no criteria file and no live `<slug>-po`: start i
 3. `implemented` whose operational checks no longer pass (dirty worktree, HEAD moved): `blocked: delivery mismatch`, dependents not yet started stay `pending`.
 4. Locks: clean up as in Shared resources. Never remove a lock without checking its `run` and `worker`.
 
-Live workers from a previous coordinator (`herdr agent list` shows the slugs): adopt them, `herdr agent wait` on each, do not restart. Then continue the loop.
+Live workers from a previous coordinator (`herdr agent list` shows the `<slug>-<colour>` names): adopt them, `herdr agent wait` on each, do not restart. Then continue the loop.
 
 ## Stops
 
@@ -295,7 +296,7 @@ List each conflicting pair under `Predicted conflicts`. This reads git only; it 
 - The coordinator never edits code, runs the test suite, reviews a diff, performs functional validation, resolves a conflict, pushes or deploys. Its only merge is the preparation merge in step 2. Review and validation belong to implement-task, or in subagent mode to the reviewer the coordinator starts; the coordinator checks that a delivery is what it claims, not that it is good.
 - Workers never push. Branches stay local until the user integrates them in `Merge order`.
 - One worktree per task. Never reuse a worktree for a second task.
-- Agent name = pane label = slug (`<slug>-po` for a PO). Target workers by name, never by sidebar position.
+- Agent name `<slug>-<colour>`, pane label `<slug>` (`<slug>-po` for a PO, both). Target workers by name, never by sidebar position.
 
 ## Report
 
