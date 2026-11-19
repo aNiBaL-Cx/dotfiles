@@ -1,0 +1,12 @@
+repo = "fullfabric"
+
+# Root pane stays an empty shell: delegate-task runs `herdr agent start --pane <root pane>` here.
+[[tabs]]
+name = "maestro"
+
+[[tabs]]
+name = "git"
+command = "lazygit"
+
+[[tabs]]
+name = "shell"

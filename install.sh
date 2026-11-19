@@ -22,6 +22,15 @@ mkdir -p "$HOME/.config/herdr"
 ln -sfn "$repo/herdr/config.toml" "$HOME/.config/herdr/config.toml"
 echo "linked ~/.config/herdr/config.toml"
 
+# herdr-plus worktree auto-layouts. Linked per file: the plugin's config dir also
+# holds files it seeds itself (quick-actions/).
+hp="$HOME/.config/herdr/plugins/config/cloudmanic.herdr-plus/worktrees"
+mkdir -p "$hp"
+for f in "$repo"/herdr/herdr-plus/worktrees/*.toml; do
+  ln -sfn "$f" "$hp/$(basename "$f")"
+  echo "linked $hp/$(basename "$f")"
+done
+
 # Starts the tmux server at login with no GUI, so @continuum-restore brings the
 # last session back after a reboot (replaces @continuum-boot — see tmux.conf).
 #
