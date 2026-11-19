@@ -274,6 +274,17 @@ else
   echo "skipped Obsidian hotkeys (no vault registry or python3)"
 fi
 
+# Copied, not linked: colima rewrites its config on `colima start --<flag>`,
+# which would replace a symlink. An existing config is never overwritten.
+colima_conf="$HOME/.colima/default/colima.yaml"
+if [ -e "$colima_conf" ]; then
+  echo "skipped $colima_conf (exists)"
+else
+  mkdir -p "$(dirname "$colima_conf")"
+  cp "$repo/colima/colima.yaml" "$colima_conf"
+  echo "copied $colima_conf"
+fi
+
 if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
   git clone --depth 1 https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
   echo "installed TPM"

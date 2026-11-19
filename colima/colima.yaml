@@ -1,0 +1,57 @@
+# Colima VM config (Docker engine without Docker Desktop).
+# install.sh copies this to ~/.colima/default/colima.yaml only when none exists.
+# Colima rewrites that file when `colima start` gets flags, so it is not a symlink.
+# After changing values on a machine, copy the file back here.
+#
+# Tuning:
+# - memory: the VM has no swap. A container that outgrows it is OOM-killed
+#   inside the VM, and the host never sees it. Raise it when containers die
+#   without errors; lower it when the host itself is under memory pressure.
+# - cpu / memory change with: colima stop && colima start --cpu <n> --memory <GiB>
+#   Volumes and images survive. Containers without a restart policy need
+#   `docker compose up -d` afterwards.
+# - disk can grow, never shrink, without recreating the VM (colima delete).
+# - vmType vz + mountType virtiofs give the fastest bind mounts on Apple
+#   Silicon. The default sshfs mount is much slower.
+#
+cpu: 4
+disk: 60
+memory: 5
+arch: aarch64
+runtime: docker
+modelRunner: docker
+hostname: colima
+kubernetes:
+  enabled: false
+  version: v1.35.0+k3s1
+  k3sArgs:
+    - --disable=traefik
+  port: 0
+autoActivate: true
+network:
+  address: false
+  mode: shared
+  interface: en0
+  preferredRoute: false
+  dns: null
+  dnsHosts: {}
+  hostAddresses: false
+  gatewayAddress: 192.168.5.2
+forwardAgent: false
+docker: {}
+vmType: vz
+portForwarder: ssh
+rosetta: false
+binfmt: true
+nestedVirtualization: false
+mountType: virtiofs
+mountInotify: false
+cpuType: ""
+provision: null
+sshConfig: true
+sshPort: 0
+mounts: []
+diskImage: ""
+forceDiskImage: false
+rootDisk: 20
+env: {}
