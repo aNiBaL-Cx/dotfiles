@@ -52,6 +52,7 @@ alias ha='herdr session attach'
 alias hls='herdr session list'
 alias hag='herdr agent list | jq -r ".result.agents[] | \"\(.pane_id)\t\(.agent_status)\t\(.name // \"-\")\t\(.cwd)\""'
 alias hw='herdr worktree list'
+alias hrv='herdr-reviewr'
 
 # Claude
 alias cl="claude"
