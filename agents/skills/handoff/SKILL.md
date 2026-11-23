@@ -74,7 +74,7 @@ Each section holds one kind of memory, and each kind has one fate:
 - What was done: git log, and the index's `Interactions`.
 - Inventories, script outputs, test matrices: a separate file next to it in `.handoff/`, linked from `Links`.
 - A trap that stays true after the task closes: it is a `Promote at close` line, not working state.
-- Customer or tenant data (names, emails, ids, exports): never, not even as an example.
+- Personal data from a customer (names, emails and ids of its people; exports of its records): never, not even as an example. Naming a customer or tenant is fine.
 
 ## Rules
 

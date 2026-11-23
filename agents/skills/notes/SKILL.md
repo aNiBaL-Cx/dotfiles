@@ -44,7 +44,7 @@ Task IDs are whatever the project's tracker uses (`TASK-001` below). Which track
 - **Older notes stay put.** Notes named before a convention keep their name until archived. Renaming outside Obsidian breaks wikilinks.
 - **Frontmatter:** `tags: ticket`, unless the vault says otherwise.
 - **Register.** Match the voice and density of the vault's exemplar note when it has one.
-- **No customer data.** Names, emails, ids and exports of customers or tenants never enter a note. A versioned vault cannot forget them on request. Describe the case; keep the data where it lives.
+- **No personal data from customers.** Names, emails and ids of a customer's people (students, applicants, end users), and exports of its records, never enter a note. A versioned vault cannot forget them on request. Describe the case; keep the data where it lives. Naming a customer or tenant and describing how it is configured is fine, and so is saying which colleague decided what.
 
 ### The index is the contact point between agents
 
