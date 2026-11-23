@@ -44,12 +44,14 @@ Task IDs are whatever the project's tracker uses (`TASK-001` below). Which track
 - **Older notes stay put.** Notes named before a convention keep their name until archived. Renaming outside Obsidian breaks wikilinks.
 - **Frontmatter:** `tags: ticket`, unless the vault says otherwise.
 - **Register.** Match the voice and density of the vault's exemplar note when it has one.
+- **No personal data from customers.** Names, emails and ids of a customer's people (students, applicants, end users), and exports of its records, never enter a note. A versioned vault cannot forget them on request. Describe the case; keep the data where it lives. Naming a customer or tenant and describing how it is configured is fine, and so is saying which colleague decided what.
 
 ### The index is the contact point between agents
 
 Several agents and sessions touch one task. The index is where they meet: it is fresher than any transcript and it is the only shared state.
 
 - **Read the index first**, before the code and the conversation. Then `.handoff/<ID>.md` at the worktree root if present: the `handoff` skill's transient resume state, possibly fresher still. It never lives in the vault.
+- **A review agent reads neither.** It gets the diff, the task and the acceptance criteria, so its verdict is not anchored on the author's reasoning. It appends its dated line to `Review` without reading `Decisions`, `Attempted & abandoned` or the handoff.
 - **Write back before you finish.** Append one dated line to the section that is yours (`Review`, `QA`, `Scope changes`, `Interactions`) and update `**Status:**` so it is still true.
 - **Never rewrite another agent's line.** Add a dated line that supersedes it and say what changed.
 - **Conclusions in the index, evidence in the sub-note.** File:line goes to `<ID>-investigation.md`. Screenshots and per-scenario results go to `test_results/`, which is disposable: deleted at archive, and nothing outside it links to its files. Each QA run is one or two lines in the index's `QA` section: date, environment, build, counts.
@@ -63,7 +65,8 @@ Several agents and sessions touch one task. The index is where they meet: it is 
 - **`Decisions` are one-liners:** the choice, the rejected alternative, and a link to the PR that holds the why. The PR body is the source of the reasoning, because it survives a squash merge and reviewers have no vault. Never copy its paragraphs back. No PR yet → link the investigation sub-note.
 - **`Review` and `QA` stay even when empty**, as `**not reviewed**` / `**not run**`. The absence is the signal.
 - `Sub-notes` is the folder's table of contents: one line per companion file, plus one shared unlinked line for disposable artifacts (`test_results/`).
-- Add `Scope changes`, `Notes`, `Gotchas` or `Manual testing` only when there is something for them. `Scope changes` is dated: what changed, who asked, the effect on acceptance criteria or estimate.
+- `Promote` holds what should outlive the task, one line each: `semantic:` for a durable fact about the domain or the system, `procedural:` for a rule about how to work. It replaces `Gotchas`. Nothing reads a task index after archive, so a fact or a rule left only here is lost; the archive step moves each line out.
+- Add `Scope changes`, `Notes`, `Promote` or `Manual testing` only when there is something for them. `Scope changes` is dated: what changed, who asked, the effect on acceptance criteria or estimate.
 - The process timeline goes to the tracker as comments, not the note.
 
 ## Sizing: three kinds of note
@@ -100,8 +103,9 @@ Read `<ID>-index.md` and summarize: status, next action, blockers, whether it wa
 When the tracker says done:
 
 1. Run the vault's close-out process first, if the vault's agent instructions name one. Nothing in the index is rewritten or trimmed at archive time; it is the record as it stands.
-2. Delete `test_results/`, and any legacy `<ID>-handoff*.md`, if still there.
-3. Move the folder to `<archive>`, at the path the vault's README or agent instructions give (default: same path as under `<tasks>`). Move it in Obsidian so links update.
+2. If that process did not already do it, empty `Promote` (index and `.handoff/<ID>.md`): propose each line as a diff to its home, a reference note under resources for `semantic:`, the agent instructions, a rule file or a skill for `procedural:`. Show every diff and apply only what the user approves, never on a repo's default branch. Mark each line in the index with where it went, or `dropped`.
+3. Delete `test_results/`, `.handoff/<ID>.md` in the task's worktrees, and any legacy `<ID>-handoff*.md`, if still there.
+4. Move the folder to `<archive>`, at the path the vault's README or agent instructions give (default: same path as under `<tasks>`). Move it in Obsidian so links update.
 
 ### Link in the daily note
 

@@ -5,7 +5,7 @@ description: "Rewrite a handoff file in the repo's local .handoff/ folder so ano
 
 # Handoff
 
-A transfer note: read once, by one reader, soon, then dead. It holds the state now, the next three actions, and the traps. Everything else is a link.
+A transfer note: read once, by one reader, soon, then dead. It holds the state now and the next three actions, points at what the index already records, and lists what should outlive the task. Everything else is a link.
 
 **Announce at start:** "I'm using the handoff skill."
 
@@ -27,7 +27,7 @@ A transfer note: read once, by one reader, soon, then dead. It holds the state n
 
 1. Read the current `.handoff/<slug>.md` if any.
 2. Check git state: `git status`, `git log --oneline -10`, PR checks (`gh pr checks`) when a PR exists.
-3. Write the file (format below). Hard cap 40 lines.
+3. Write the file (format below). Hard cap 30 lines. Over the cap: cut `Episodic` to links first, never `Working`.
 4. Print the path.
 
 ## Format
@@ -35,41 +35,52 @@ A transfer note: read once, by one reader, soon, then dead. It holds the state n
 ```markdown
 # Handoff: {slug}, {short title}
 
-**Updated:** {YYYY-MM-DD HH:MM} by {agent or session}
 **Ticket:** {ID + link, or "none"}
+**Worktree:** {absolute path} — one per repo
+**Branch:** {repo: branch} — one per repo
+**Updated:** {YYYY-MM-DD HH:MM} by {agent or session}
 **PR:** {link, open/draft, checks state on head sha} — one per repo
-**Repo/Branch:** {repo: branch, worktree path} — one per repo
 **State:** {in-progress | blocked | ready-for-review | paused}: {one clause: uncommitted / pushed / green / reviewed}
 
-## Goal
-{1-2 sentences. What this delivers.}
-
-## Next
+## Working
+Goal: {one sentence. What this delivers.}
+Next:
 1. {concrete step: file, command, or check}
 2. {…}
 3. {…}
+Dirty: {uncommitted files, failing tests, what must be re-checked before running anything; or "clean"}
+Open: {needs a human: who, what, since when; or "nothing"}
 
-## Traps
-- {what looks right and is wrong; what must be re-checked before running anything}
+## Episodic
+- {dead end or decision since the index was last updated}: in the index {yes | NO, write it before stopping}
 
-## Open
-- {needs a human: who, what, since when}
+## Promote at close
+- semantic: {durable fact about the domain or the system}
+- procedural: {rule or trap that stays true after this task}
 
 ## Links
-- {PR, Linear issue, related files}
+- {PR, tracker issue, index, related files}
 ```
+
+Each section holds one kind of memory, and each kind has one fate:
+
+- **Working** is the state now. It dies when the task closes. Nothing in it is copied anywhere.
+- **Episodic** is pointers only. The text of a dead end or a decision lives in the task index; this section says whether it is there yet. With no index, one line each.
+- **Promote at close** is candidates, not content: one line each, no explanation. The project's close-out process turns each line into a proposed change to the reference notes (semantic) or to the agent instructions, a rule file or a skill (procedural). Leave the section out when there is nothing.
 
 ## What does NOT go here
 
 - Decisions and why: PR body, and the ticket index in the notes vault when the work has one.
 - What was done: git log, and the index's `Interactions`.
 - Inventories, script outputs, test matrices: a separate file next to it in `.handoff/`, linked from `Links`.
+- A trap that stays true after the task closes: it is a `Promote at close` line, not working state.
+- Personal data from a customer (names, emails and ids of its people; exports of its records): never, not even as an example. Naming a customer or tenant is fine.
 
 ## Rules
 
 - Concrete: file paths, commands, shas. "Finish the feature" is not a next step.
 - State facts. No narrative.
-- Uncommitted changes and failing tests are traps: name them.
+- Uncommitted changes and failing tests go in `Dirty`: name them.
 - Self-contained: the reader must not need this conversation.
 
 ## Instructing the next agent
